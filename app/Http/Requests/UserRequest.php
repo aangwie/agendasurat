@@ -55,6 +55,7 @@ class UserRequest extends FormRequest
             'password' => $isUpdate
                 ? ['nullable', 'string', Password::min(8), 'confirmed']
                 : ['required', 'string', Password::min(8), 'confirmed'],
+            'is_admin' => ['nullable', 'boolean'],
         ];
     }
 

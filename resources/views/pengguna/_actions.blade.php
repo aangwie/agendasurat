@@ -8,6 +8,7 @@
         'name' => $user->name,
         'email' => $user->email,
         'phone' => $user->phone,
+        'is_admin' => (bool) $user->is_admin,
         'update_url' => route('pengguna.update', $user),
     ]) }}"
     title="Edit pengguna" aria-label="Edit pengguna {{ $user->name }}"

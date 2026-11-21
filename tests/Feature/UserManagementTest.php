@@ -35,7 +35,7 @@ class UserManagementTest extends TestCase
     {
         User::factory()->create(['name' => 'Bidang Umum', 'phone' => '0811111111']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->get('/pengguna')
             ->assertOk()
             ->assertSee('Nama Bidang')
@@ -52,7 +52,7 @@ class UserManagementTest extends TestCase
 
     public function test_a_user_can_be_created(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->post('/pengguna', $this->payload())
             ->assertRedirect(route('pengguna.index'))
             ->assertSessionHas('status');
@@ -67,7 +67,7 @@ class UserManagementTest extends TestCase
 
     public function test_creating_requires_all_fields(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->post('/pengguna', [])
             ->assertSessionHasErrors(['name', 'email', 'phone', 'password'])
             ->assertSessionHas('open_form', 'create');
@@ -75,7 +75,7 @@ class UserManagementTest extends TestCase
 
     public function test_the_password_must_be_confirmed_and_long_enough(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->post('/pengguna', $this->payload([
                 'password' => 'pendek',
                 'password_confirmation' => 'beda',
@@ -87,14 +87,14 @@ class UserManagementTest extends TestCase
     {
         User::factory()->create(['email' => 'dikdas@instansi.go.id']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->post('/pengguna', $this->payload())
             ->assertSessionHasErrors('email');
     }
 
     public function test_the_phone_number_must_be_valid(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->post('/pengguna', $this->payload(['phone' => '12345']))
             ->assertSessionHasErrors('phone');
     }
@@ -104,7 +104,7 @@ class UserManagementTest extends TestCase
         $user = User::factory()->create(['password' => 'password-lama']);
         $oldPassword = $user->password;
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->put("/pengguna/{$user->id}", $this->payload([
                 'email' => $user->email,
                 'name' => 'Bidang Sosial',
@@ -126,7 +126,7 @@ class UserManagementTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->put("/pengguna/{$user->id}", $this->payload([
                 'email' => $user->email,
                 'password' => 'password-baru',
@@ -141,7 +141,7 @@ class UserManagementTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->delete("/pengguna/{$user->id}")
             ->assertRedirect(route('pengguna.index'))
             ->assertSessionHas('status');
@@ -151,7 +151,7 @@ class UserManagementTest extends TestCase
 
     public function test_a_user_cannot_delete_their_own_account(): void
     {
-        $admin = User::factory()->create();
+        $admin = User::factory()->admin()->create();
 
         $this->actingAs($admin)
             ->delete("/pengguna/{$admin->id}")
@@ -166,7 +166,7 @@ class UserManagementTest extends TestCase
         User::factory()->create(['name' => 'Bidang Umum', 'email' => 'umum@instansi.go.id', 'phone' => '0811111111']);
         User::factory()->create(['name' => 'Bidang Sosial', 'email' => 'sosial@instansi.go.id', 'phone' => '0822222222']);
 
-        $admin = User::factory()->create();
+        $admin = User::factory()->admin()->create();
 
         $this->actingAs($admin)->get('/pengguna?q=sosial')
             ->assertOk()->assertSee('Bidang Sosial')->assertDontSee('Bidang Umum');
@@ -179,7 +179,7 @@ class UserManagementTest extends TestCase
     {
         User::factory()->count(12)->create();
 
-        $admin = User::factory()->create();
+        $admin = User::factory()->admin()->create();
 
         $first = $this->actingAs($admin)->get('/pengguna');
         $first->assertOk()->assertSee('1–10');
@@ -194,7 +194,7 @@ class UserManagementTest extends TestCase
     {
         User::factory()->create(['name' => 'Bidang Umum']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->admin()->create())
             ->get('/pengguna', ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
             ->assertSee('Bidang Umum')

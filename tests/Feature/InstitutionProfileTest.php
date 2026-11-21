@@ -35,7 +35,7 @@ class InstitutionProfileTest extends TestCase
 
     public function test_the_update_form_is_rendered(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->get('/profil-instansi')
@@ -52,7 +52,7 @@ class InstitutionProfileTest extends TestCase
 
     public function test_the_institution_profile_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->put('/profil-instansi', $this->payload(['website' => 'https://diskominfo.bandung.go.id']))
@@ -72,7 +72,7 @@ class InstitutionProfileTest extends TestCase
 
     public function test_invalid_input_is_rejected(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->put('/profil-instansi', [
@@ -89,7 +89,7 @@ class InstitutionProfileTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)->put('/profil-instansi', [
             ...$this->payload(),
@@ -117,7 +117,7 @@ class InstitutionProfileTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->put('/profil-instansi', [
@@ -129,7 +129,7 @@ class InstitutionProfileTest extends TestCase
 
     public function test_the_sidebar_links_to_the_institution_profile(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->get('/dashboard')

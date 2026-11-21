@@ -39,6 +39,28 @@
                             inputmode="tel" maxlength="30" />
                     </div>
 
+                    <div>
+                        <label data-admin-option
+                            class="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 transition hover:border-zinc-300 hover:bg-zinc-50 has-checked:border-rose-400 has-checked:bg-rose-50/60 has-checked:ring-1 has-checked:ring-rose-200">
+                            <input type="checkbox" name="is_admin" value="1" data-admin-checkbox
+                                class="mt-0.5 size-4 shrink-0 rounded border-zinc-300 accent-rose-600">
+
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-zinc-800">Administrator</span>
+                                <span class="mt-0.5 block text-xs leading-relaxed text-zinc-500">
+                                    Memberi akses ke menu Profil Instansi, Pengguna, dan Pengaturan.
+                                </span>
+                            </span>
+                        </label>
+
+                        @error('is_admin')
+                            <p role="alert" class="mt-2 flex items-start gap-1.5 text-xs font-medium text-rose-600">
+                                <x-icon name="x-mark" class="mt-px size-3.5 shrink-0" />
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
                     <div class="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4">
                         <p class="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">
                             <x-icon name="lock" class="size-3.5" />

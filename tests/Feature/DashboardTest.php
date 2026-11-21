@@ -77,7 +77,8 @@ class DashboardTest extends TestCase
 
     public function test_the_sidebar_module_pages_can_be_rendered(): void
     {
-        $user = User::factory()->create();
+        // Menu sistem (Pengguna/Pengaturan) hanya untuk administrator.
+        $user = User::factory()->admin()->create();
 
         $routes = [
             'surat-masuk.index',

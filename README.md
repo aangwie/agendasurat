@@ -22,6 +22,9 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
 - **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
 - **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, email, no HP, password + konfirmasi password; datatable dengan pencarian, slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
+- **Hak akses (admin)**: menu **Profil Instansi**, **Pengguna**, dan **Pengaturan** hanya terlihat dan
+  dapat diakses oleh pengguna bertanda **Administrator** (selain itu menu disembunyikan dan URL
+  mengembalikan 403). Administrator dapat menunjuk admin lain lewat checkbox di form Pengguna.
 - Menu profil di pojok kanan navbar (Profil Saya, Pengaturan, Keluar).
 - Halaman profil pengguna dan halaman penanda untuk modul yang belum tersedia.
 - Tema aksen **zinc & rose** dengan font Plus Jakarta Sans.
@@ -87,6 +90,7 @@ APP_TIMEZONE=Asia/Jakarta
 | `resources/js/datatable.js` | Datatable generik (pencarian, slice, pagination) |
 | `resources/js/date-display.js` | Format tanggal Indonesia (`12 Agustus 2026`) untuk input tanggal |
 | `resources/js/surat-masuk.js` | Modal tambah/edit + buka ulang saat validasi gagal |
+| `app/Http/Middleware/EnsureUserIsAdmin.php` | Middleware pembatas akses admin (menu sistem) |
 | `app/Http/Controllers/UserController.php` | CRUD pengguna + datatable |
 | `app/Http/Requests/UserRequest.php` | Validasi pengguna (email unik, password + konfirmasi, no HP) |
 | `resources/views/pengguna/index.blade.php` | Halaman manajemen pengguna |

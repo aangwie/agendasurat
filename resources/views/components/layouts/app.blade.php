@@ -23,6 +23,8 @@
         ],
         [
             'label' => 'Sistem',
+            // Menu sistem hanya untuk administrator.
+            'adminOnly' => true,
             'items' => [
                 ['title' => 'Profil Instansi', 'icon' => 'building-office', 'route' => 'profil-instansi.edit'],
                 ['title' => 'Pengguna', 'icon' => 'users', 'route' => 'pengguna.index'],
@@ -30,6 +32,14 @@
             ],
         ],
     ];
+
+    $isAdmin = $user?->isAdmin() ?? false;
+
+    // Sembunyikan grup menu sistem bagi pengguna selain admin.
+    $navigation = array_values(array_filter(
+        $navigation,
+        fn (array $group): bool => ! ($group['adminOnly'] ?? false) || $isAdmin,
+    ));
 
     $isActive = function (string $route): bool {
         if (request()->routeIs($route)) {
@@ -194,11 +204,14 @@
                                 <x-icon name="user" class="size-4 text-zinc-400" />
                                 Profil Saya
                             </a>
-                            <a href="{{ route('pengaturan.index') }}"
-                                class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900">
-                                <x-icon name="cog" class="size-4 text-zinc-400" />
-                                Pengaturan
-                            </a>
+
+                            @if ($isAdmin)
+                                <a href="{{ route('pengaturan.index') }}"
+                                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900">
+                                    <x-icon name="cog" class="size-4 text-zinc-400" />
+                                    Pengaturan
+                                </a>
+                            @endif
                         </div>
 
                         <div class="border-t border-zinc-100 p-1.5">

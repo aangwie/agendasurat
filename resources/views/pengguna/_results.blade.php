@@ -61,11 +61,21 @@
 
                             <div class="min-w-0">
                                 <p class="truncate font-semibold text-zinc-900">{{ $user->name }}</p>
-                                @if (auth()->id() === $user->id)
-                                    <span class="badge mt-1 bg-rose-50 text-rose-600 ring-1 ring-rose-100">
-                                        Akun Anda
-                                    </span>
-                                @endif
+
+                                <div class="mt-1 flex flex-wrap items-center gap-1">
+                                    @if ($user->isAdmin())
+                                        <span class="badge bg-zinc-900 text-white">
+                                            <x-icon name="shield-check" class="size-3" />
+                                            Administrator
+                                        </span>
+                                    @endif
+
+                                    @if (auth()->id() === $user->id)
+                                        <span class="badge bg-rose-50 text-rose-600 ring-1 ring-rose-100">
+                                            Akun Anda
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     </td>

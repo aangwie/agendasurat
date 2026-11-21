@@ -76,6 +76,7 @@ class UserController extends Controller
             'phone' => $request->validated('phone'),
             'password' => Hash::make($request->validated('password')),
             'email_verified_at' => now(),
+            'is_admin' => $request->boolean('is_admin'),
         ]);
 
         return redirect()
@@ -88,10 +89,28 @@ class UserController extends Controller
      */
     public function update(UserRequest $request, User $pengguna): RedirectResponse
     {
+        $wantsAdmin = $request->boolean('is_admin');
+
+        // Jangan sampai tidak ada administrator sama sekali.
+        if ($pengguna->isAdmin() && ! $wantsAdmin) {
+            if ($request->user()->is($pengguna)) {
+                return redirect()
+                    ->route('pengguna.index')
+                    ->withErrors(['is_admin' => 'Anda tidak dapat mencabut hak administrator akun sendiri.']);
+            }
+
+            if (User::query()->where('is_admin', true)->count() <= 1) {
+                return redirect()
+                    ->route('pengguna.index')
+                    ->withErrors(['is_admin' => 'Minimal harus ada satu administrator.']);
+            }
+        }
+
         $data = [
             'name' => $request->validated('name'),
             'email' => $request->validated('email'),
             'phone' => $request->validated('phone'),
+            'is_admin' => $wantsAdmin,
         ];
 
         // Password hanya diubah bila diisi.
@@ -121,6 +140,12 @@ class UserController extends Controller
             return redirect()
                 ->route('pengguna.index')
                 ->withErrors(['pengguna' => 'Pengguna terakhir tidak dapat dihapus.']);
+        }
+
+        if ($pengguna->isAdmin() && User::query()->where('is_admin', true)->count() <= 1) {
+            return redirect()
+                ->route('pengguna.index')
+                ->withErrors(['pengguna' => 'Administrator terakhir tidak dapat dihapus.']);
         }
 
         $name = $pengguna->name;

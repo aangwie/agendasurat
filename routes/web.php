@@ -22,9 +22,26 @@ Route::middleware('auth')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('profil', [ProfileController::class, 'show'])->name('profil.show');
 
-    Route::get('profil-instansi', [InstitutionProfileController::class, 'edit'])->name('profil-instansi.edit');
-    Route::put('profil-instansi', [InstitutionProfileController::class, 'update'])->name('profil-instansi.update');
+    Route::middleware('admin')->group(function () {
+        Route::get('profil-instansi', [InstitutionProfileController::class, 'edit'])->name('profil-instansi.edit');
+        Route::put('profil-instansi', [InstitutionProfileController::class, 'update'])->name('profil-instansi.update');
 
+        Route::get('pengguna', [UserController::class, 'index'])->name('pengguna.index');
+        Route::post('pengguna', [UserController::class, 'store'])->name('pengguna.store');
+        Route::put('pengguna/{pengguna}', [UserController::class, 'update'])->name('pengguna.update');
+        Route::delete('pengguna/{pengguna}', [UserController::class, 'destroy'])->name('pengguna.destroy');
+
+        Route::view('pengaturan', 'modules.placeholder', [
+            'title' => 'Pengaturan',
+            'description' => 'Sesuaikan identitas instansi, format penomoran, dan preferensi aplikasi.',
+            'icon' => 'cog',
+            'features' => [
+                'Profil dan logo instansi',
+                'Format penomoran surat',
+                'Preferensi tampilan aplikasi',
+            ],
+        ])->name('pengaturan.index');
+    });
     Route::get('surat-masuk', [IncomingLetterController::class, 'index'])->name('surat-masuk.index');
     Route::post('surat-masuk', [IncomingLetterController::class, 'store'])->name('surat-masuk.store');
     Route::put('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'update'])->name('surat-masuk.update');
@@ -76,19 +93,4 @@ Route::middleware('auth')->group(function () {
             'Statistik surat per bagian',
         ],
     ])->name('laporan.index');
-
-    Route::get('pengguna', [UserController::class, 'index'])->name('pengguna.index');
-    Route::post('pengguna', [UserController::class, 'store'])->name('pengguna.store');
-    Route::put('pengguna/{pengguna}', [UserController::class, 'update'])->name('pengguna.update');
-    Route::delete('pengguna/{pengguna}', [UserController::class, 'destroy'])->name('pengguna.destroy');
-    Route::view('pengaturan', 'modules.placeholder', [
-        'title' => 'Pengaturan',
-        'description' => 'Sesuaikan identitas instansi, format penomoran, dan preferensi aplikasi.',
-        'icon' => 'cog',
-        'features' => [
-            'Profil dan logo instansi',
-            'Format penomoran surat',
-            'Preferensi tampilan aplikasi',
-        ],
-    ])->name('pengaturan.index');
 });

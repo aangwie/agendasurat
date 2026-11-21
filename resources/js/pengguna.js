@@ -34,6 +34,8 @@ export function initUserManagement() {
         phone: form.querySelector('[name="phone"]'),
     };
 
+    const adminCheckbox = form.querySelector('[data-admin-checkbox]');
+
     let lastFocused = null;
 
     const setPasswordRequired = (required) => {
@@ -96,6 +98,10 @@ export function initUserManagement() {
 
         if (reset) {
             form.reset();
+
+            if (adminCheckbox) {
+                adminCheckbox.checked = false;
+            }
         }
 
         open();
@@ -118,6 +124,10 @@ export function initUserManagement() {
 
             if (passwordConfirm) {
                 passwordConfirm.value = '';
+            }
+
+            if (adminCheckbox) {
+                adminCheckbox.checked = payload.is_admin === true;
             }
         }
 
