@@ -31,11 +31,28 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
 
 ## Akun demo
 
-| Email | Kata sandi |
-| --- | --- |
-| `admin@agendasurat.test` | `password` |
+| Email | Kata sandi | Peran |
+| --- | --- | --- |
+| `admin@agendasurat.test` | `password` | Administrator |
 
 Akun dibuat melalui `DatabaseSeeder`. Ganti kata sandi sebelum dipakai di lingkungan nyata.
+
+### Akun bidang (BidangUserSeeder)
+
+Dibuat otomatis oleh `php artisan db:seed` (atau `--class=BidangUserSeeder`).
+Semua akun memakai kata sandi **`@Dewisartika17`** dan **bukan** administrator.
+
+| Kode Register | Bidang / Subbagian | Username |
+| --- | --- | --- |
+| 408.37.01 | Subbagian Umum dan Kepegawaian / Tata Usaha | `umum.01@dindikpct.go.id` |
+| 408.37.02 | Sekretariat (Keuangan & Aset / Program & Perencanaan) | `sekretariat.02@dindikpct.go.id` |
+| 408.37.03 | Bidang Pembinaan Sekolah Dasar (SD) | `sd.03@dindikpct.go.id` |
+| 408.37.04 | Bidang Pembinaan Sekolah Menengah Pertama (SMP) | `smp.04@dindikpct.go.id` |
+| 408.37.05 | Bidang Pembinaan PAUD dan PNF | `paud.05@dindikpct.go.id` |
+| 408.37.06 | Bidang Pendidik dan Tenaga Kependidikan (PTK) | `ptk.06@dindikpct.go.id` |
+
+Pola username: `{slug bidang}.{2 digit terakhir kode register}@dindikpct.go.id`.
+Seeder bersifat **non-destruktif** (`updateOrCreate`), jadi aman dijalankan ulang.
 
 ## Menjalankan aplikasi
 
@@ -75,6 +92,7 @@ APP_TIMEZONE=Asia/Jakarta
 | `app/Http/Controllers/LetterClassificationController.php` | Datatable klasifikasi (cari, slice, pagination) |
 | `app/Models/LetterClassification.php` | Model hierarki kode klasifikasi arsip |
 | `database/seeders/LetterClassificationSeeder.php` | Import 3.972 kode klasifikasi dari lampiran Permendagri 83/2022 |
+| `database/seeders/BidangUserSeeder.php` | 6 akun bidang (username dari kode register, password seragam) |
 | `database/seeders/data/klasifikasi-arsip.json` | Dataset lampiran (Kemendagri & Pemerintah Daerah) |
 | `resources/views/klasifikasi/index.blade.php` | Halaman klasifikasi + toolbar datatable |
 | `resources/views/klasifikasi/_results.blade.php` | Partial tabel (dipakai halaman penuh & AJAX) |

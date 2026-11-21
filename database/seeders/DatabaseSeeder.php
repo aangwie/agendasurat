@@ -24,5 +24,6 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call(LetterClassificationSeeder::class);
+        $this->call(BidangUserSeeder::class);
     }
 }
