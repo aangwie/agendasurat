@@ -1,0 +1,210 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@theme {
+    --font-sans: 'Plus Jakarta Sans', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --animate-fade-up: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    --animate-fade-in: fade-in 0.35s ease-out both;
+
+    @keyframes fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(14px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    ::selection {
+        background-color: var(--color-rose-500);
+        color: var(--color-white);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-rose-400);
+        outline-offset: 2px;
+    }
+
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+        outline: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+@layer components {
+    .form-label {
+        @apply mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-700;
+    }
+
+    .form-input {
+        @apply block w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 shadow-xs transition duration-150 placeholder:text-zinc-400 hover:border-zinc-300 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 focus:outline-none;
+    }
+
+    .form-input-error {
+        @apply border-rose-300 bg-rose-50/50 focus:border-rose-400;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .btn-primary {
+        @apply bg-rose-600 text-white shadow-sm shadow-rose-600/25 hover:bg-rose-500 active:bg-rose-700;
+    }
+
+    .btn-secondary {
+        @apply border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:border-zinc-300 hover:bg-zinc-50;
+    }
+
+    .btn-ghost {
+        @apply text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900;
+    }
+
+    .card {
+        @apply rounded-2xl border border-zinc-200/80 bg-white shadow-xs;
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+    }
+}
+
+@utility scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-zinc-700) transparent;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background-color: var(--color-zinc-700);
+    }
+
+    &::-webkit-scrollbar-track {
+        background-color: transparent;
+    }
+}
+
+@utility bg-grid-rose {
+    background-image:
+        linear-gradient(
+            to right,
+            color-mix(in oklab, var(--color-rose-400) 14%, transparent) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            to bottom,
+            color-mix(in oklab, var(--color-rose-400) 14%, transparent) 1px,
+            transparent 1px
+        );
+    background-size: 44px 44px;
+}
+
+@utility bg-noise {
+    background-image: radial-gradient(
+        color-mix(in oklab, var(--color-white) 8%, transparent) 0.5px,
+        transparent 0.5px
+    );
+    background-size: 6px 6px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Sidebar minimize / maximize
+|--------------------------------------------------------------------------
+| `--sidebar-width` is consumed by the app shell and the sidebar itself.
+| The attribute lives on <html> so the state can be applied before first
+| paint (see the inline script in the app layout) and survive navigation.
+| These rules stay unlayered on purpose so they win over Tailwind utilities.
+*/
+
+:root {
+    --sidebar-width: 18rem;
+}
+
+[data-sidebar] {
+    transition:
+        width 0.3s ease-out,
+        transform 0.3s ease-out;
+}
+
+[data-app-shell] {
+    transition: padding-left 0.3s ease-out;
+}
+
+@media (min-width: 64rem) {
+    html[data-sidebar-minimized='true'] {
+        --sidebar-width: 5rem;
+    }
+
+    html[data-sidebar-minimized='true'] [data-logo-text],
+    html[data-sidebar-minimized='true'] [data-sidebar-heading],
+    html[data-sidebar-minimized='true'] [data-sidebar-label],
+    html[data-sidebar-minimized='true'] [data-sidebar-badge],
+    html[data-sidebar-minimized='true'] [data-sidebar-footer] {
+        display: none;
+    }
+
+    html[data-sidebar-minimized='true'] [data-sidebar-divider] {
+        display: block;
+    }
+
+    html[data-sidebar-minimized='true'] [data-sidebar-header] {
+        justify-content: center;
+        padding-inline: 0;
+    }
+
+    html[data-sidebar-minimized='true'] [data-nav-item] {
+        height: 2.75rem;
+        justify-content: center;
+        gap: 0;
+        padding: 0;
+    }
+}
+
