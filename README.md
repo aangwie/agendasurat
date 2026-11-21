@@ -91,6 +91,8 @@ APP_TIMEZONE=Asia/Jakarta
 | `resources/js/date-display.js` | Format tanggal Indonesia (`12 Agustus 2026`) untuk input tanggal |
 | `resources/js/surat-masuk.js` | Modal tambah/edit + buka ulang saat validasi gagal |
 | `app/Http/Middleware/EnsureUserIsAdmin.php` | Middleware pembatas akses admin (menu sistem) |
+| `resources/js/csrf.js` | Penyegaran token CSRF + penanganan sesi berakhir (419) |
+| `resources/views/errors/419.blade.php` | Halaman ramah untuk error 419 Page Expired |
 | `app/Http/Controllers/UserController.php` | CRUD pengguna + datatable |
 | `app/Http/Requests/UserRequest.php` | Validasi pengguna (email unik, password + konfirmasi, no HP) |
 | `resources/views/pengguna/index.blade.php` | Halaman manajemen pengguna |
@@ -201,6 +203,35 @@ Data contoh opsional (28 baris) untuk mencoba datatable:
 ```bash
 php artisan db:seed --class=IncomingLetterSeeder
 ```
+
+## Penanganan 419 Page Expired
+
+Aplikasi memakai beberapa lapis perlindungan agar halaman tidak sering menampilkan
+**419 Page Expired**:
+
+1. **Masa sesi diperpanjang** — `SESSION_LIFETIME=240` menit (4 jam) dan
+   `SESSION_EXPIRE_ON_CLOSE=false`, jadi sesi tidak habis saat tab ditutup.
+2. **Token disegarkan otomatis** — `resources/js/csrf.js` memanggil `/csrf-token`
+   setiap 5 menit dan setiap kali tab kembali aktif. Endpoint ini sekaligus
+   memperpanjang masa aktif sesi, sehingga selama tab dibuka sesi tidak kedaluwarsa.
+3. **Token disisipkan otomatis** pada setiap request `fetch` non-GET dan pada axios
+   (`X-CSRF-TOKEN` dari `<meta name="csrf-token">`).
+4. **Halaman 419 yang ramah** — `resources/views/errors/419.blade.php` menampilkan
+   penjelasan, tombol *Muat Ulang Sekarang*, dan hitung mundur muat ulang otomatis.
+5. **Respons JSON untuk AJAX** — request AJAX menerima
+   `{"message": "...", "csrf_expired": true}` dan memunculkan notifikasi SweetAlert
+   untuk memuat ulang halaman.
+
+Penyebab umum yang sebaiknya dihindari: membuka aplikasi dari dua alamat berbeda
+(`localhost` vs `127.0.0.1`), menghapus cookie saat halaman masih terbuka, atau
+mengganti `APP_KEY` saat pengguna masih login.
+
+## Build assets ikut di-repository
+
+Folder `public/build` **tidak** di-ignore sehingga hasil `npm run build` ikut
+ter-upload ke GitHub. Server/hosting dapat langsung menjalankan aplikasi tanpa
+harus menjalankan Vite terlebih dahulu. Setelah mengubah CSS/JS, jalankan
+`npm run build` lalu commit folder `public/build`.
 
 ## Aturan pengembangan
 

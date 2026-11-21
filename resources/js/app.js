@@ -5,6 +5,10 @@ import { initServerDatatable } from './datatable';
 import { initIncomingLetters } from './surat-masuk';
 import { initUserManagement } from './pengguna';
 import { initDateDisplays } from './date-display';
+import { initCsrfProtection } from './csrf';
+
+// Dipakai juga oleh modul lain (mis. penanganan sesi berakhir di csrf.js).
+window.Swal = Swal;
 
 const onReady = (callback) => {
     if (document.readyState === 'loading') {
@@ -290,6 +294,11 @@ onReady(() => {
 
         startTimer();
     });
+
+    /**
+     * Proteksi CSRF: segarkan token & jaga sesi tetap aktif agar tidak 419.
+     */
+    initCsrfProtection();
 
     /**
      * Datatable klasifikasi (pencarian, slice data, pagination via AJAX).

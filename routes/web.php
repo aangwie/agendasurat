@@ -7,9 +7,18 @@ use App\Http\Controllers\InstitutionProfileController;
 use App\Http\Controllers\LetterClassificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
+
+// Token CSRF segar + memperpanjang masa aktif sesi selama tab masih terbuka.
+// Dipakai oleh resources/js/csrf.js agar halaman tidak "419 Page Expired".
+Route::get('csrf-token', function (Request $request) {
+    return response()
+        ->json(['token' => csrf_token()])
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+})->name('csrf-token');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
