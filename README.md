@@ -23,7 +23,7 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
 - **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
 - **Agenda**: input **Tanggal, Tempat, Penanggung Jawab, Peserta**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **edit** & **hapus** (konfirmasi SweetAlert2).
 - **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, email, no HP, password + konfirmasi password; datatable dengan pencarian, slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
-- **Pengaturan (admin)**: update ke GitHub (token terenkripsi), tombol `migrate --force` / clear cache / symlink, backup & import database, serta terminal log aktivitas.
+- **Pengaturan (admin)**: pull dari GitHub (token terenkripsi), tombol `migrate --force` / clear cache / symlink, backup & import database, serta terminal log aktivitas.
 - **Hak akses (admin)**: menu **Profil Instansi**, **Pengguna**, dan **Pengaturan** hanya terlihat dan
   dapat diakses oleh pengguna bertanda **Administrator** (selain itu menu disembunyikan dan URL
   mengembalikan 403). Administrator dapat menunjuk admin lain lewat checkbox di form Pengguna.
@@ -113,7 +113,7 @@ APP_TIMEZONE=Asia/Jakarta
 | `app/Http/Middleware/EnsureUserIsAdmin.php` | Middleware pembatas akses admin (menu sistem) |
 | `resources/js/csrf.js` | Penyegaran token CSRF + penanganan sesi berakhir (419) |
 | `resources/views/errors/419.blade.php` | Halaman ramah untuk error 419 Page Expired |
-| `app/Services/DeploymentService.php` | Eksekusi git push, artisan, backup/import database + log |
+| `app/Services/DeploymentService.php` | Eksekusi git pull, artisan, backup/import database + log |
 | `app/Http/Controllers/SettingsController.php` | Halaman Pengaturan (admin) |
 | `app/Models/AppSetting.php` | Penyimpanan pengaturan (token terenkripsi) |
 | `resources/views/pengaturan/index.blade.php` | UI pengaturan + terminal log |
@@ -267,17 +267,14 @@ harus menjalankan Vite terlebih dahulu. Setelah mengubah CSS/JS, jalankan
 
 Menu **Pengaturan** (khusus administrator) menyediakan:
 
-- **Update ke GitHub** — cukup isi **Token GitHub (PAT)**; repository & branch memakai nilai
+- **Sinkronisasi GitHub** — cukup isi **Token GitHub (PAT)**; repository & branch memakai nilai
   tersimpan (ditampilkan sebagai info tujuan, bukan input). Token disimpan **terenkripsi**
   di tabel `app_settings` dan hanya ditampilkan tersamar.
 
-  Dua tombol sinkronisasi:
-  - **Push (dari Lokal)** — `git add` → `git commit` → `git push` (memakai token bila diisi,
-    atau remote `origin` bila token kosong).
-  - **Pull (di Hosting)** — `git pull` untuk mengambil perubahan terbaru dari GitHub ke server.
-
-  Keduanya memakai konfirmasi SweetAlert2, dan token disamarkan (`***`) pada log.
-  Tombol **Tes Token** memeriksa izin tulis sebelum push.
+  Aplikasi hanya melakukan **Pull**: tombol *Pull dari GitHub* menjalankan `git pull`
+  untuk mengambil perubahan terbaru dari repository ke server, dengan konfirmasi
+  SweetAlert2. Token disamarkan (`***`) pada log. Tombol **Tes Token** memeriksa izin
+  baca sebelum pull. Push dilakukan dari komputer pengembang (`git push`), bukan dari aplikasi.
 - **Perintah Artisan** — tombol untuk `php artisan migrate --force`,
   `php artisan optimize:clear`, dan `php artisan storage:link`.
 - **Backup Database** — membuat berkas `.sql` di `storage/app/backups` (di-ignore git) dan
@@ -288,26 +285,23 @@ Menu **Pengaturan** (khusus administrator) menyediakan:
   (tersimpan di `storage/logs/deploy.log`), lengkap dengan status, muat ulang, dan bersihkan log.
 
 > **Penting:** isi token dengan PAT GitHub asli (format `github_pat_...`) yang memiliki izin
-> `Contents: Read and write` pada repository tujuan. Nilai `github_patxxxxxxxxxxxxxxxxxxx`
+> `Contents: Read` pada repository tujuan. Nilai `github_patxxxxxxxxxxxxxxxxxxx`
 > hanyalah contoh — ganti dengan token Anda sendiri. Perintah dijalankan tanpa shell
 > (argumen terpisah) sehingga aman dari injeksi, dan hanya aksi yang ada di whitelist
 > yang diterima server.
 
-### Jika push ditolak (error 403 / 401)
+### Jika pull gagal (error 401 / 403 / 404)
 
-Tombol **Tes Token** memeriksa token lewat GitHub API sebelum push dan menampilkan
+Tombol **Tes Token** memeriksa token lewat GitHub API sebelum pull dan menampilkan
 penyebabnya secara spesifik:
 
 | Pesan | Arti & solusi |
 | --- | --- |
 | `401 Bad credentials` | Token salah/kedaluwarsa → buat token baru. |
-| `Token dikenali sebagai X, tetapi TIDAK punya izin tulis` | Fine-grained token belum diberi **Contents: Read and write**, atau repository belum dipilih pada *Repository access*. |
+| `Token dikenali sebagai X, tetapi TIDAK punya izin baca` | Fine-grained token belum diberi **Contents: Read**, atau repository belum dipilih pada *Repository access*. |
 | `404` | Token tidak diberi akses ke repository tersebut. |
-| `protected branch` | Branch dilindungi; push langsung ke branch itu ditolak. |
-
-Bila push via token gagal, aplikasi otomatis mencoba **jalur cadangan** `git push origin`
-(kredensial yang tersimpan di server) dan mencatatnya di log. Matikan jalur cadangan dengan
-`DEPLOY_ORIGIN_FALLBACK=false` pada `.env` bila tidak diinginkan.
+| `perubahan lokal belum di-commit` | Server memiliki perubahan lokal; commit/simpan dulu sebelum pull. |
+| `konflik merge` | Selesaikan konflik di server, lalu commit. |
 
 Untuk lingkungan pengujian, set `DEPLOY_COMMANDS_ENABLED=false` agar perintah git/artisan
 tidak dieksekusi (sudah diatur pada `phpunit.xml`).

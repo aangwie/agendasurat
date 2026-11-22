@@ -81,7 +81,7 @@ class SettingsController extends Controller
     public function action(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'action' => ['required', Rule::in(['git-push', 'git-pull', 'git-verify', 'migrate', 'clear-cache', 'symlink'])],
+            'action' => ['required', Rule::in(['git-pull', 'git-verify', 'migrate', 'clear-cache', 'symlink'])],
             'message' => ['nullable', 'string', 'max:200'],
         ]);
 
@@ -109,12 +109,6 @@ class SettingsController extends Controller
         }
 
         $result = match ($data['action']) {
-            'git-push' => $this->deployment->pushToGitHub(
-                $token,
-                $repo,
-                $branch,
-                (string) ($data['message'] ?? AppSetting::get('commit_message', 'chore: update dari halaman pengaturan')),
-            ),
             'git-pull' => $this->deployment->pullFromGitHub($token, $repo, $branch),
             'migrate' => $this->deployment->migrate(),
             'clear-cache' => $this->deployment->clearCache(),

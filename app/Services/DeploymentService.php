@@ -140,7 +140,7 @@ class DeploymentService
     }
 
     /**
-     * Periksa token GitHub: akun pemilik token + izin tulis ke repository.
+     * Periksa token GitHub: akun pemilik token + izin baca ke repository.
      *
      * @return array{ok: bool, can_push: bool, login: ?string, default_branch: ?string, scopes: ?string, message: string}
      */
@@ -202,17 +202,16 @@ class DeploymentService
             }
 
             $permissions = $repository->json('permissions');
-            $canPush = is_array($permissions) ? (bool) ($permissions['push'] ?? false) : false;
+            $canRead = is_array($permissions) ? (bool) ($permissions['pull'] ?? false) : false;
             $defaultBranch = $repository->json('default_branch');
 
-            if (! $canPush) {
+            if (! $canRead) {
                 return [
                     'ok' => true, 'can_push' => false, 'login' => $login,
                     'default_branch' => is_string($defaultBranch) ? $defaultBranch : null,
                     'scopes' => $scopes,
-                    'message' => "Token dikenali sebagai {$login}, tetapi TIDAK punya izin tulis ke {$slug}. "
-                        .'Aktifkan permission "Contents: Read and write" (fine-grained) '
-                        .'atau scope "repo" (classic token).',
+                    'message' => "Token dikenali sebagai {$login}, tetapi TIDAK punya izin baca ke {$slug}. "
+                        .'Aktifkan permission "Contents: Read" (fine-grained) atau scope "repo" (classic token).',
                 ];
             }
 
@@ -220,7 +219,7 @@ class DeploymentService
                 'ok' => true, 'can_push' => true, 'login' => $login,
                 'default_branch' => is_string($defaultBranch) ? $defaultBranch : null,
                 'scopes' => $scopes,
-                'message' => "Token valid: {$login} memiliki izin tulis ke {$slug}.",
+                'message' => "Token valid: {$login} memiliki izin baca ke {$slug} (siap untuk pull).",
             ];
         } catch (\Throwable $exception) {
             return [
@@ -229,136 +228,6 @@ class DeploymentService
                 'message' => 'Tidak dapat menghubungi GitHub: '.$exception->getMessage(),
             ];
         }
-    }
-
-    /**
-     * Update repository ke GitHub memakai Personal Access Token.
-     *
-     * @return array{ok: bool, log: string}
-     */
-    public function pushToGitHub(string $token, string $repo, string $branch, string $message): array
-    {
-        $this->appendLog('=== '.now()->format('Y-m-d H:i:s').' | Push ke GitHub ===');
-
-        $repo = trim($repo);
-        $branch = trim($branch) ?: 'main';
-        $message = trim($message) ?: 'chore: update dari halaman pengaturan';
-
-        $log = [];
-
-        // Tanpa token: gunakan remote "origin" (kredensial tersimpan di komputer lokal).
-        if ($token === '') {
-            if (! config('surat.deployment.commands_enabled', true)) {
-                $this->appendLog('Perintah git dilewati (DEPLOY_COMMANDS_ENABLED=false).');
-
-                return ['ok' => false, 'log' => 'Perintah git dinonaktifkan pada environment ini.'];
-            }
-
-            if ($repo === '' || ! $this->hasRemote('origin')) {
-                $this->appendLog('GAGAL: token kosong dan remote "origin" tidak tersedia.');
-
-                return ['ok' => false, 'log' => 'Isi token GitHub atau siapkan remote origin.'];
-            }
-
-            if (! $this->commitChanges($message, $log)) {
-                return ['ok' => false, 'log' => implode("\n", $log)];
-            }
-
-            if ($this->pushToOrigin($branch, $log) === true) {
-                $this->appendLog('SELESAI: berhasil di-push melalui remote origin.');
-
-                return [
-                    'ok' => true,
-                    'log' => implode("\n", $log),
-                    'hint' => 'Push berhasil melalui remote origin.',
-                ];
-            }
-
-            return ['ok' => false, 'log' => implode("\n", $log), 'hint' => 'Push melalui origin gagal.'];
-        }
-
-        if ($repo === '') {
-            $this->appendLog('GAGAL: repository wajib diisi.');
-
-            return ['ok' => false, 'log' => 'Repository wajib diisi.'];
-        }
-
-        // 1. Verifikasi token lebih dulu agar penyebab 403/401 langsung jelas.
-        $check = $this->verifyGitHubToken($token, $repo);
-        $this->appendLog('Verifikasi token: '.$check['message']);
-
-        $log = ['Verifikasi token: '.$check['message']];
-        // Perintah git tidak dijalankan bila dinonaktifkan (mis. pada pengujian).
-        if (! config('surat.deployment.commands_enabled', true)) {
-            $this->appendLog('Perintah git dilewati (DEPLOY_COMMANDS_ENABLED=false).');
-
-            return [
-                'ok' => false,
-                'log' => implode("\n", $log),
-                'hint' => $check['can_push']
-                    ? 'Perintah git dinonaktifkan pada environment ini.'
-                    : $check['message'],
-            ];
-        }
-
-        if (! $check['ok'] || ! $check['can_push']) {
-            $this->appendLog('PERINGATAN: token tidak dapat dipakai untuk push.');
-
-            // Jalur cadangan: commit lalu push melalui remote "origin".
-            if (! $this->commitChanges($message, $log)) {
-                return ['ok' => false, 'log' => implode("\n", $log), 'hint' => $check['message']];
-            }
-
-            if ($this->pushToOrigin($branch, $log) === true) {
-                $this->appendLog('SELESAI: berhasil di-push melalui remote origin.');
-
-                return [
-                    'ok' => true,
-                    'log' => implode("\n", $log),
-                    'hint' => $check['message'].' Push dilakukan melalui remote origin (kredensial server).',
-                ];
-            }
-
-            return ['ok' => false, 'log' => implode("\n", $log), 'hint' => $check['message']];
-        }
-
-        // 2. Commit perubahan.
-        if (! $this->commitChanges($message, $log)) {
-            return ['ok' => false, 'log' => implode("\n", $log)];
-        }
-
-        $remote = $this->authenticatedRemote($token, $repo);
-        $push = $this->runProcess(['git', 'push', $remote, 'HEAD:'.$branch], 180);
-        $masked = $this->maskSecrets($push['output'], [$token]);
-        $maskedRemote = $this->maskSecrets($remote, [$token]);
-
-        $log[] = '$ git push '.$maskedRemote.' HEAD:'.$branch;
-        $log[] = $masked;
-
-        $this->appendLog('$ git push '.$maskedRemote.' HEAD:'.$branch);
-        $this->appendLog($masked);
-
-        if ($push['exitCode'] === 0) {
-            $this->appendLog('SELESAI: berhasil di-push.');
-
-            return ['ok' => true, 'log' => implode("\n", $log)];
-        }
-
-        // 4. Push via token gagal: diagnosis + jalur cadangan remote "origin".
-        $diagnosis = $this->diagnosePushFailure($masked);
-        $this->appendLog('GAGAL: '.$diagnosis);
-
-        if ($this->pushToOrigin($branch, $log) === true) {
-            $this->appendLog('SELESAI: berhasil di-push melalui remote origin.');
-
-            return [
-                'ok' => true,
-                'log' => implode("\n", $log),
-                'hint' => 'Push berhasil melalui remote origin (kredensial tersimpan di server).',
-            ];
-        }
-
-        return ['ok' => false, 'log' => implode("\n", $log), 'hint' => $diagnosis];
     }
 
     /**
@@ -436,90 +305,6 @@ class DeploymentService
             str_contains($lower, 'not found'), str_contains($lower, '404') => 'Repository/branch tidak ditemukan atau token tidak diberi akses.',
             str_contains($lower, 'conflict') => 'Terjadi konflik merge. Selesaikan konflik di server lalu commit.',
             default => 'Pull gagal. Periksa detail pada log di atas.',
-        };
-    }
-
-    /**
-     * Commit seluruh perubahan. Mengembalikan false bila gagal.
-     *
-     * @param  list<string>  $log
-     */
-    private function commitChanges(string $message, array &$log): bool
-    {
-        $steps = [
-            ['git', 'add', '-A'],
-            [
-                'git',
-                '-c', 'user.name=Agenda Surat',
-                '-c', 'user.email=noreply@agendasurat.local',
-                'commit', '-m', $message,
-            ],
-        ];
-
-        foreach ($steps as $step) {
-            $result = $this->runProcess($step);
-            $log[] = '$ '.implode(' ', $step);
-            $log[] = $result['output'];
-            $this->appendLog('$ '.implode(' ', $step));
-            $this->appendLog($result['output']);
-
-            // "nothing to commit" bukan kegagalan: tetap lanjut push.
-            if ($result['exitCode'] !== 0 && ! str_contains(strtolower($result['output']), 'nothing to commit')) {
-                $this->appendLog('GAGAL pada langkah: '.implode(' ', $step));
-
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Push melalui remote "origin" (kredensial tersimpan di server).
-     * Mengembalikan null bila remote origin tidak tersedia.
-     *
-     * @param  list<string>  $log
-     */
-    private function pushToOrigin(string $branch, array &$log): ?bool
-    {
-        if (! config('surat.deployment.origin_fallback', true)) {
-            $this->appendLog('Jalur cadangan origin dinonaktifkan (DEPLOY_ORIGIN_FALLBACK=false).');
-
-            return null;
-        }
-
-        if (! $this->hasRemote('origin')) {
-            return null;
-        }
-
-        $this->appendLog('Mencoba jalur cadangan: git push origin HEAD:'.$branch);
-
-        $result = $this->runProcess(['git', 'push', 'origin', 'HEAD:'.$branch], 180);
-        $log[] = '$ git push origin HEAD:'.$branch.' (cadangan)';
-        $log[] = $result['output'];
-        $this->appendLog('$ git push origin HEAD:'.$branch.' (cadangan)');
-        $this->appendLog($result['output']);
-
-        return $result['exitCode'] === 0;
-    }
-
-    /**
-     * Terjemahkan kegagalan push menjadi panduan yang bisa ditindaklanjuti.
-     */
-    public function diagnosePushFailure(string $output): string
-    {
-        $lower = strtolower($output);
-
-        return match (true) {
-            str_contains($lower, 'denied to'), str_contains($lower, '403') => 'Token tidak punya izin tulis ke repository. '
-                .'Buat fine-grained token dengan permission "Contents: Read and write" '
-                .'dan pastikan repository ini dipilih pada "Repository access".',
-            str_contains($lower, 'bad credentials'), str_contains($lower, '401') => 'Token tidak valid atau kedaluwarsa. Buat token baru.',
-            str_contains($lower, 'repository not found'), str_contains($lower, '404') => 'Repository tidak ditemukan atau token tidak diberi akses ke repository tersebut.',
-            str_contains($lower, 'protected') => 'Branch dilindungi (protected branch). Push langsung ke branch ini ditolak.',
-            str_contains($lower, 'non-fast-forward'), str_contains($lower, 'rejected') => 'Remote memiliki commit yang belum ada di server. Tarik (pull) perubahan terlebih dahulu.',
-            str_contains($lower, 'terminal prompts disabled') => 'Kredensial tidak tersedia. Isi token GitHub terlebih dahulu.',
-            default => 'Push ditolak. Periksa detail pada log di atas.',
         };
     }
 

@@ -3,12 +3,6 @@
  * dan terminal log. Semua aksi dikonfirmasi dengan SweetAlert2.
  */
 const CONFIRMATIONS = {
-    'git-push': {
-        title: 'Push ke GitHub?',
-        text: 'Perubahan dari komputer ini akan di-commit lalu di-push ke repository. Lanjutkan?',
-        confirm: 'Ya, push',
-        icon: 'question',
-    },
     'git-pull': {
         title: 'Pull dari GitHub?',
         text: 'Server ini akan mengambil perubahan terbaru dari repository. Lanjutkan?',
@@ -36,7 +30,6 @@ const CONFIRMATIONS = {
 };
 
 const LABELS = {
-    'git-push': 'Push ke GitHub',
     'git-pull': 'Pull dari GitHub',
     migrate: 'Migrasi database',
     'clear-cache': 'Bersihkan cache',
