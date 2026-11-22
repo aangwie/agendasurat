@@ -81,15 +81,38 @@ class SettingsController extends Controller
     public function action(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'action' => ['required', Rule::in(['git-push', 'migrate', 'clear-cache', 'symlink'])],
+            'action' => ['required', Rule::in(['git-push', 'git-verify', 'migrate', 'clear-cache', 'symlink'])],
             'message' => ['nullable', 'string', 'max:200'],
         ]);
 
+        // Token dari form (bila baru diisi) atau token tersimpan.
+        $token = filled($request->input('token'))
+            ? trim((string) $request->input('token'))
+            : (string) AppSetting::getSecret('github_token');
+
+        $repo = (string) AppSetting::get('github_repo', 'github.com/aangwie/agendasurat');
+        $branch = (string) AppSetting::get('github_branch', 'main');
+
+        if ($data['action'] === 'git-verify') {
+            $check = $this->deployment->verifyGitHubToken($token, $repo);
+
+            $this->deployment->appendLog('=== '.now()->format('Y-m-d H:i:s').' | Verifikasi token GitHub ===');
+            $this->deployment->appendLog($check['message']);
+
+            return response()->json([
+                'ok' => $check['ok'] && $check['can_push'],
+                'log' => $check['message'],
+                'hint' => $check['message'],
+                'verification' => $check,
+                'lines' => $this->deployment->logLines(200),
+            ]);
+        }
+
         $result = match ($data['action']) {
             'git-push' => $this->deployment->pushToGitHub(
-                (string) AppSetting::getSecret('github_token'),
-                (string) AppSetting::get('github_repo', 'github.com/aangwie/agendasurat'),
-                (string) AppSetting::get('github_branch', 'main'),
+                $token,
+                $repo,
+                $branch,
                 (string) ($data['message'] ?? AppSetting::get('commit_message', 'chore: update dari halaman pengaturan')),
             ),
             'migrate' => $this->deployment->migrate(),
@@ -100,6 +123,7 @@ class SettingsController extends Controller
         return response()->json([
             'ok' => $result['ok'],
             'log' => $result['log'],
+            'hint' => $result['hint'] ?? null,
             'lines' => $this->deployment->logLines(200),
         ]);
     }

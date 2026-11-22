@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DeploymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class SettingsTest extends TestCase
@@ -117,6 +118,124 @@ class SettingsTest extends TestCase
         $this->assertSame('github.com/aangwie/agendasurat', AppSetting::get('github_repo'));
         $this->assertSame('main', AppSetting::get('github_branch'));
         $this->assertSame('github_pat_baru', AppSetting::getSecret('github_token'));
+    }
+
+    public function test_a_token_without_write_permission_is_reported_clearly(): void
+    {
+        Http::fake([
+            'api.github.com/user' => Http::response(['login' => 'aangwie'], 200, ['x-oauth-scopes' => 'read:user']),
+            'api.github.com/repos/aangwie/agendasurat' => Http::response([
+                'default_branch' => 'main',
+                'permissions' => ['admin' => false, 'push' => false, 'pull' => true],
+            ], 200),
+        ]);
+
+        $result = app(DeploymentService::class)->verifyGitHubToken('github_pat_x', 'github.com/aangwie/agendasurat');
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['can_push']);
+        $this->assertSame('aangwie', $result['login']);
+        $this->assertStringContainsString('TIDAK punya izin tulis', $result['message']);
+        $this->assertStringContainsString('Contents: Read and write', $result['message']);
+    }
+
+    public function test_a_valid_token_with_push_permission_passes_verification(): void
+    {
+        Http::fake([
+            'api.github.com/user' => Http::response(['login' => 'aangwie'], 200),
+            'api.github.com/repos/aangwie/agendasurat' => Http::response([
+                'default_branch' => 'main',
+                'permissions' => ['admin' => true, 'push' => true, 'pull' => true],
+            ], 200),
+        ]);
+
+        $result = app(DeploymentService::class)->verifyGitHubToken('github_pat_x', 'github.com/aangwie/agendasurat');
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['can_push']);
+        $this->assertSame('main', $result['default_branch']);
+    }
+
+    public function test_an_invalid_token_is_reported(): void
+    {
+        Http::fake([
+            'api.github.com/user' => Http::response(['message' => 'Bad credentials'], 401),
+        ]);
+
+        $result = app(DeploymentService::class)->verifyGitHubToken('salah', 'github.com/aangwie/agendasurat');
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('401', $result['message']);
+    }
+
+    public function test_a_repository_without_access_is_reported(): void
+    {
+        Http::fake([
+            'api.github.com/user' => Http::response(['login' => 'aangwie'], 200),
+            'api.github.com/repos/aangwie/agendasurat' => Http::response(['message' => 'Not Found'], 404),
+        ]);
+
+        $result = app(DeploymentService::class)->verifyGitHubToken('github_pat_x', 'github.com/aangwie/agendasurat');
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('404', $result['message']);
+    }
+
+    public function test_push_is_aborted_before_git_when_the_token_lacks_permission(): void
+    {
+        Http::fake([
+            'api.github.com/user' => Http::response(['login' => 'aangwie'], 200),
+            'api.github.com/repos/aangwie/agendasurat' => Http::response([
+                'permissions' => ['push' => false],
+            ], 200),
+        ]);
+
+        $result = app(DeploymentService::class)->pushToGitHub(
+            'github_pat_x',
+            'github.com/aangwie/agendasurat',
+            'main',
+            'chore: uji',
+        );
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('izin tulis', $result['hint']);
+        // Tidak ada perintah git yang dijalankan, jadi tidak ada baris "$ git push".
+        $this->assertStringNotContainsString('$ git push', $result['log']);
+    }
+
+    public function test_the_push_failure_diagnosis_maps_common_errors(): void
+    {
+        $service = app(DeploymentService::class);
+
+        $this->assertStringContainsString(
+            'Contents: Read and write',
+            $service->diagnosePushFailure('remote: Permission to aangwie/agendasurat.git denied to aangwie.'),
+        );
+
+        $this->assertStringContainsString(
+            'Token tidak valid',
+            $service->diagnosePushFailure('fatal: Authentication failed: Bad credentials'),
+        );
+
+        $this->assertStringContainsString(
+            'tidak ditemukan',
+            $service->diagnosePushFailure('remote: Repository not found.'),
+        );
+
+        $this->assertStringContainsString(
+            'dilindungi',
+            $service->diagnosePushFailure('remote: error: GH006: Protected branch update failed'),
+        );
+    }
+
+    public function test_the_repository_slug_is_parsed_from_various_formats(): void
+    {
+        $service = app(DeploymentService::class);
+
+        $this->assertSame('aangwie/agendasurat', $service->repositorySlug('github.com/aangwie/agendasurat'));
+        $this->assertSame('aangwie/agendasurat', $service->repositorySlug('https://github.com/aangwie/agendasurat.git'));
+        $this->assertSame('aangwie/agendasurat', $service->repositorySlug('aangwie/agendasurat'));
+        $this->assertNull($service->repositorySlug('bukan-repo'));
     }
 
     public function test_only_whitelisted_actions_are_accepted(): void

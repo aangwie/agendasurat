@@ -109,6 +109,11 @@
                             Simpan Token
                         </button>
 
+                        <button type="button" data-verify="git-verify" class="btn btn-secondary flex-1">
+                            <x-icon name="shield-check" class="size-4" />
+                            Tes Token
+                        </button>
+
                         <button type="button" data-run="git-push" class="btn btn-primary flex-1">
                             <x-icon name="arrow-up-tray" class="size-4" />
                             Update ke GitHub

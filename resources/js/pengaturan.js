@@ -50,6 +50,7 @@ export function initSettingsPage() {
     const statusDot = root.querySelector('[data-terminal-dot]');
     const timeLabel = root.querySelector('[data-terminal-time]');
     const actionButtons = Array.from(root.querySelectorAll('[data-run]'));
+    const verifyButtons = Array.from(root.querySelectorAll('[data-verify]'));
     const backupButton = root.querySelector('[data-backup]');
     const backupList = root.querySelector('[data-backup-list]');
     const githubForm = root.querySelector('[data-github-form]');
@@ -99,7 +100,7 @@ export function initSettingsPage() {
     };
 
     const setBusy = (busy) => {
-        [...actionButtons, backupButton].forEach((button) => {
+        [...actionButtons, ...verifyButtons, backupButton].forEach((button) => {
             if (button) {
                 button.disabled = busy;
                 button.classList.toggle('opacity-60', busy);
@@ -236,12 +237,45 @@ export function initSettingsPage() {
                     payload.ok,
                     payload.ok ? 'Berhasil' : 'Gagal',
                     payload.ok
-                        ? `${LABELS[action] ?? 'Aksi'} selesai dijalankan.`
-                        : 'Periksa terminal log untuk detail kesalahan.',
+                        ? (payload.hint ?? `${LABELS[action] ?? 'Aksi'} selesai dijalankan.`)
+                        : (payload.hint ?? 'Periksa terminal log untuk detail kesalahan.'),
                 );
             } catch (error) {
                 setStatus('Gagal', 'error');
                 notify(false, 'Gagal', error.message);
+            } finally {
+                setBusy(false);
+            }
+        });
+    });
+
+    // ---- Tes token GitHub (tanpa konfirmasi) ----
+    verifyButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+            const body = new URLSearchParams({ action: button.dataset.verify });
+            const tokenInput = githubForm?.querySelector('[name="token"]');
+
+            // Pakai token yang baru diketik (bila ada) agar bisa diuji sebelum disimpan.
+            if (tokenInput?.value) {
+                body.append('token', tokenInput.value);
+            }
+
+            setBusy(true);
+            setStatus('Memeriksa token…', 'running');
+
+            try {
+                const payload = await request(urls.action, { method: 'POST', body });
+
+                renderTerminal(payload.lines);
+                setStatus(payload.ok ? 'Token valid' : 'Token bermasalah', payload.ok ? 'idle' : 'error');
+                notify(
+                    payload.ok,
+                    payload.ok ? 'Token valid' : 'Token tidak dapat dipakai',
+                    payload.hint ?? payload.log,
+                );
+            } catch (error) {
+                setStatus('Gagal', 'error');
+                notify(false, 'Gagal memeriksa token', error.message);
             } finally {
                 setBusy(false);
             }
