@@ -60,7 +60,7 @@ class LetterClassificationTest extends TestCase
             ->assertSee('Telekomunikasi')
             ->assertSee('data-table-search', escape: false)
             ->assertSee('data-table-per-page', escape: false)
-            ->assertSee('25 data');
+            ->assertSee('10 data');
     }
 
     public function test_rows_are_indented_according_to_the_hierarchy_level(): void
@@ -123,6 +123,28 @@ class LetterClassificationTest extends TestCase
         $this->assertSame(10, substr_count($lastPage->getContent(), 'data-row'));
     }
 
+    public function test_the_default_page_shows_ten_rows(): void
+    {
+        foreach (range(1, 30) as $i) {
+            LetterClassification::create([
+                'scope' => 'pemda',
+                'code' => str_pad((string) ($i * 10), 3, '0', STR_PAD_LEFT),
+                'name' => 'Kategori Uji '.$i,
+                'level' => 1,
+                'sort_order' => $i,
+            ]);
+        }
+
+        $response = $this->actingAs(User::factory()->create())
+            ->get('/klasifikasi')
+            ->assertOk()
+            ->assertSee('1–10')
+            ->assertSee('10 data');
+
+        // Tanpa parameter per_page, slice terkecil (10 baris) yang dipakai.
+        $this->assertSame(10, substr_count($response->getContent(), 'data-row'));
+    }
+
     public function test_invalid_per_page_value_falls_back_to_the_default(): void
     {
         $this->seedTree();
@@ -130,7 +152,7 @@ class LetterClassificationTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('/klasifikasi?per_page=999')
             ->assertOk()
-            ->assertSee('25 data');
+            ->assertSee('10 data');
     }
 
     public function test_ajax_requests_only_return_the_table_partial(): void

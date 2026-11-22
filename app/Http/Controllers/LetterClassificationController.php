@@ -17,7 +17,7 @@ class LetterClassificationController extends Controller
      */
     private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
-    private const DEFAULT_PER_PAGE = 25;
+    private const DEFAULT_PER_PAGE = 10;
 
     /**
      * Display the hierarchical letter classification (Permendagri 83/2022).

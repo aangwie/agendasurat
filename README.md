@@ -16,7 +16,7 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
 - Sidebar navigasi responsif (drawer di ponsel, tetap tampil di desktop) yang mendukung **minimize / maximize** dengan tooltip ikon dan status tersimpan di `localStorage`.
 - Menu sidebar: Dashboard, Surat Masuk, Surat Keluar, Surat Tugas, Agenda, Klasifikasi, Laporan, Profil Instansi, Pengguna, dan Pengaturan.
 - **Profil Instansi**: formulir pembaruan data instansi (nama pemerintahan, nama instansi, alamat instansi, alamat website, alamat email) sekaligus upload/ganti logo pemerintah dengan pratinjau langsung.
-- **Klasifikasi Surat**: hierarki kode klasifikasi arsip (4 level) sesuai lampiran Permendagri Nomor 83 Tahun 2022, lengkap dengan datatable (pencarian, slice data 10/25/50/100, dan pagination).
+- **Klasifikasi Surat**: hierarki kode klasifikasi arsip (4 level) sesuai lampiran Permendagri Nomor 83 Tahun 2022, lengkap dengan datatable (pencarian, slice data **10**/25/50/100 dengan default 10, dan pagination).
 - **Dashboard**: 4 kartu ringkasan (Surat Masuk, Surat Keluar, Surat Tugas, Total Surat) dan grafik 3 bar —
   Surat Masuk (merah `#e11d48`), Surat Keluar (biru laut `#1e3a8a`), Surat Tugas (kuning tua `#ca8a04`).
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
