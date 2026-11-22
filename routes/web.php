@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\IncomingLetterController;
@@ -80,17 +81,10 @@ Route::middleware('auth')->group(function () {
         ],
     ])->name('surat-tugas.index');
 
-    Route::view('agenda', 'modules.placeholder', [
-        'title' => 'Agenda',
-        'description' => 'Atur jadwal kegiatan kantor dan pantau agenda harian seluruh bagian.',
-        'icon' => 'calendar',
-        'features' => [
-            'Kalender kegiatan terpusat',
-            'Pengingat agenda mendatang',
-            'Rekap kegiatan per periode',
-        ],
-    ])->name('agenda.index');
-
+    Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
+    Route::post('agenda', [AgendaController::class, 'store'])->name('agenda.store');
+    Route::put('agenda/{agenda}', [AgendaController::class, 'update'])->name('agenda.update');
+    Route::delete('agenda/{agenda}', [AgendaController::class, 'destroy'])->name('agenda.destroy');
     Route::get('klasifikasi', [LetterClassificationController::class, 'index'])->name('klasifikasi.index');
 
     Route::view('laporan', 'modules.placeholder', [

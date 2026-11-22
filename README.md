@@ -21,6 +21,7 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
   Surat Masuk (merah `#e11d48`), Surat Keluar (biru laut `#1e3a8a`), Surat Tugas (kuning tua `#ca8a04`).
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
 - **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
+- **Agenda**: input **Tanggal, Tempat, Penanggung Jawab, Peserta**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **edit** & **hapus** (konfirmasi SweetAlert2).
 - **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, email, no HP, password + konfirmasi password; datatable dengan pencarian, slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
 - **Pengaturan (admin)**: update ke GitHub (token terenkripsi), tombol `migrate --force` / clear cache / symlink, backup & import database, serta terminal log aktivitas.
 - **Hak akses (admin)**: menu **Profil Instansi**, **Pengguna**, dan **Pengaturan** hanya terlihat dan
@@ -117,6 +118,11 @@ APP_TIMEZONE=Asia/Jakarta
 | `app/Models/AppSetting.php` | Penyimpanan pengaturan (token terenkripsi) |
 | `resources/views/pengaturan/index.blade.php` | UI pengaturan + terminal log |
 | `resources/js/pengaturan.js` | Aksi pengaturan, konfirmasi SweetAlert2, terminal |
+| `app/Http/Controllers/AgendaController.php` | CRUD agenda + datatable |
+| `app/Http/Requests/AgendaRequest.php` | Validasi agenda (tanggal, tempat, PJ, peserta) |
+| `app/Models/Agenda.php` | Model agenda + pencarian |
+| `resources/views/agenda/` | Halaman agenda (index, tabel, form modal, aksi) |
+| `resources/js/agenda.js` | Modal tambah/edit agenda |
 | `app/Http/Controllers/UserController.php` | CRUD pengguna + datatable |
 | `app/Http/Requests/UserRequest.php` | Validasi pengguna (email unik, password + konfirmasi, no HP) |
 | `resources/views/pengguna/index.blade.php` | Halaman manajemen pengguna |

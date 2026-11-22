@@ -7,6 +7,7 @@ import { initUserManagement } from './pengguna';
 import { initDateDisplays } from './date-display';
 import { initCsrfProtection } from './csrf';
 import { initSettingsPage } from './pengaturan';
+import { initAgendas } from './agenda';
 
 // Dipakai juga oleh modul lain (mis. penanganan sesi berakhir di csrf.js).
 window.Swal = Swal;
@@ -313,6 +314,7 @@ onReady(() => {
     initIncomingLetters();
     initUserManagement();
     initSettingsPage();
+    initAgendas();
     initDateDisplays();
 
     /**
