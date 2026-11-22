@@ -269,9 +269,15 @@ Menu **Pengaturan** (khusus administrator) menyediakan:
 
 - **Update ke GitHub** — cukup isi **Token GitHub (PAT)**; repository & branch memakai nilai
   tersimpan (ditampilkan sebagai info tujuan, bukan input). Token disimpan **terenkripsi**
-  di tabel `app_settings` dan hanya ditampilkan tersamar. Tombol *Update ke GitHub*
-  menjalankan `git add` → `git commit` → `git push` memakai token, dengan konfirmasi
-  SweetAlert2. Token disamarkan (`***`) pada log.
+  di tabel `app_settings` dan hanya ditampilkan tersamar.
+
+  Dua tombol sinkronisasi:
+  - **Push (dari Lokal)** — `git add` → `git commit` → `git push` (memakai token bila diisi,
+    atau remote `origin` bila token kosong).
+  - **Pull (di Hosting)** — `git pull` untuk mengambil perubahan terbaru dari GitHub ke server.
+
+  Keduanya memakai konfirmasi SweetAlert2, dan token disamarkan (`***`) pada log.
+  Tombol **Tes Token** memeriksa izin tulis sebelum push.
 - **Perintah Artisan** — tombol untuk `php artisan migrate --force`,
   `php artisan optimize:clear`, dan `php artisan storage:link`.
 - **Backup Database** — membuat berkas `.sql` di `storage/app/backups` (di-ignore git) dan

@@ -4,9 +4,15 @@
  */
 const CONFIRMATIONS = {
     'git-push': {
-        title: 'Update ke GitHub?',
-        text: 'Perubahan kode akan di-commit lalu di-push ke repository. Lanjutkan?',
-        confirm: 'Ya, update',
+        title: 'Push ke GitHub?',
+        text: 'Perubahan dari komputer ini akan di-commit lalu di-push ke repository. Lanjutkan?',
+        confirm: 'Ya, push',
+        icon: 'question',
+    },
+    'git-pull': {
+        title: 'Pull dari GitHub?',
+        text: 'Server ini akan mengambil perubahan terbaru dari repository. Lanjutkan?',
+        confirm: 'Ya, pull',
         icon: 'question',
     },
     migrate: {
@@ -30,7 +36,8 @@ const CONFIRMATIONS = {
 };
 
 const LABELS = {
-    'git-push': 'Update GitHub',
+    'git-push': 'Push ke GitHub',
+    'git-pull': 'Pull dari GitHub',
     migrate: 'Migrasi database',
     'clear-cache': 'Bersihkan cache',
     symlink: 'Buat symlink',

@@ -20,7 +20,9 @@ class SettingsTest extends TestCase
             ->get('/pengaturan')
             ->assertOk()
             ->assertSee('Pengaturan Sistem')
-            ->assertSee('Update ke GitHub')
+            ->assertSee('Sinkronisasi GitHub')
+            ->assertSee('Push (dari Lokal)')
+            ->assertSee('Pull (di Hosting)')
             ->assertSee('Perintah Artisan')
             ->assertSee('Backup Database')
             ->assertSee('Import Database')
@@ -236,6 +238,50 @@ class SettingsTest extends TestCase
         $this->assertSame('aangwie/agendasurat', $service->repositorySlug('https://github.com/aangwie/agendasurat.git'));
         $this->assertSame('aangwie/agendasurat', $service->repositorySlug('aangwie/agendasurat'));
         $this->assertNull($service->repositorySlug('bukan-repo'));
+    }
+
+    public function test_push_without_a_token_uses_the_origin_remote(): void
+    {
+        // Tanpa token: push harus mencoba remote origin (bukan langsung gagal).
+        $result = app(DeploymentService::class)->pushToGitHub('', 'github.com/aangwie/agendasurat', 'main', 'chore: uji');
+
+        // Perintah git dinonaktifkan pada pengujian, jadi hasilnya gagal dengan pesan jelas
+        // (bukan "token wajib diisi").
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('dinonaktifkan', $result['log']);
+    }
+
+    public function test_a_pull_without_commands_enabled_is_rejected(): void
+    {
+        $result = app(DeploymentService::class)->pullFromGitHub('', 'github.com/aangwie/agendasurat', 'main');
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('dinonaktifkan', $result['log']);
+    }
+
+    public function test_the_pull_failure_diagnosis_maps_common_errors(): void
+    {
+        $service = app(DeploymentService::class);
+
+        $this->assertStringContainsString(
+            'belum di-commit',
+            $service->diagnosePullFailure('error: Your local changes to the following files would be overwritten'),
+        );
+
+        $this->assertStringContainsString(
+            'berbeda',
+            $service->diagnosePullFailure('fatal: refusing to merge unrelated histories'),
+        );
+
+        $this->assertStringContainsString(
+            'konflik',
+            $service->diagnosePullFailure('CONFLICT (content): Merge conflict in app/Models/User.php'),
+        );
+
+        $this->assertStringContainsString(
+            'tidak valid',
+            $service->diagnosePullFailure('fatal: Authentication failed: Bad credentials'),
+        );
     }
 
     public function test_only_whitelisted_actions_are_accepted(): void

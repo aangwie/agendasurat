@@ -54,8 +54,8 @@
                             <x-icon name="arrow-up-tray" class="size-5" />
                         </span>
                         <div>
-                            <h3 class="text-base font-bold text-zinc-900">Update ke GitHub</h3>
-                            <p class="mt-0.5 text-xs text-zinc-500">Commit &amp; push perubahan kode dari server ini.</p>
+                            <h3 class="text-base font-bold text-zinc-900">Sinkronisasi GitHub</h3>
+                            <p class="mt-0.5 text-xs text-zinc-500">Push dari lokal &amp; pull di hosting.</p>
                         </div>
                     </div>
 
@@ -113,12 +113,40 @@
                             <x-icon name="shield-check" class="size-4" />
                             Tes Token
                         </button>
+                    </div>
 
-                        <button type="button" data-run="git-push" class="btn btn-primary flex-1">
-                            <x-icon name="arrow-up-tray" class="size-4" />
-                            Update ke GitHub
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button type="button" data-run="git-push"
+                            class="flex flex-col items-start gap-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left transition hover:bg-rose-100">
+                            <span class="flex items-center gap-2 text-sm font-semibold text-rose-700">
+                                <x-icon name="arrow-up-tray" class="size-4" />
+                                Push (dari Lokal)
+                            </span>
+                            <span class="text-[11px] leading-relaxed text-rose-600/80">
+                                Kirim perubahan dari komputer ini ke GitHub.
+                            </span>
+                        </button>
+
+                        <button type="button" data-run="git-pull"
+                            class="flex flex-col items-start gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100">
+                            <span class="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                                <x-icon name="arrow-down-tray" class="size-4" />
+                                Pull (di Hosting)
+                            </span>
+                            <span class="text-[11px] leading-relaxed text-emerald-700/80">
+                                Ambil perubahan terbaru dari GitHub ke server ini.
+                            </span>
                         </button>
                     </div>
+
+                    <p class="flex items-start gap-1.5 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+                        <x-icon name="sparkles" class="mt-px size-3.5 shrink-0 text-zinc-400" />
+                        <span>
+                            Alur: <span class="font-semibold text-zinc-700">Push</span> dari komputer lokal →
+                            <span class="font-semibold text-zinc-700">Pull</span> di hosting, lalu jalankan
+                            migrasi bila ada perubahan database.
+                        </span>
+                    </p>
                 </form>
             </section>
 

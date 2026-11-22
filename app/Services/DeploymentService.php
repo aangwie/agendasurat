@@ -238,16 +238,49 @@ class DeploymentService
      */
     public function pushToGitHub(string $token, string $repo, string $branch, string $message): array
     {
-        $this->appendLog('=== '.now()->format('Y-m-d H:i:s').' | Update ke GitHub ===');
+        $this->appendLog('=== '.now()->format('Y-m-d H:i:s').' | Push ke GitHub ===');
 
         $repo = trim($repo);
         $branch = trim($branch) ?: 'main';
         $message = trim($message) ?: 'chore: update dari halaman pengaturan';
 
-        if ($token === '' || $repo === '') {
-            $this->appendLog('GAGAL: token GitHub dan repository wajib diisi.');
+        $log = [];
 
-            return ['ok' => false, 'log' => 'Token GitHub dan repository wajib diisi.'];
+        // Tanpa token: gunakan remote "origin" (kredensial tersimpan di komputer lokal).
+        if ($token === '') {
+            if (! config('surat.deployment.commands_enabled', true)) {
+                $this->appendLog('Perintah git dilewati (DEPLOY_COMMANDS_ENABLED=false).');
+
+                return ['ok' => false, 'log' => 'Perintah git dinonaktifkan pada environment ini.'];
+            }
+
+            if ($repo === '' || ! $this->hasRemote('origin')) {
+                $this->appendLog('GAGAL: token kosong dan remote "origin" tidak tersedia.');
+
+                return ['ok' => false, 'log' => 'Isi token GitHub atau siapkan remote origin.'];
+            }
+
+            if (! $this->commitChanges($message, $log)) {
+                return ['ok' => false, 'log' => implode("\n", $log)];
+            }
+
+            if ($this->pushToOrigin($branch, $log) === true) {
+                $this->appendLog('SELESAI: berhasil di-push melalui remote origin.');
+
+                return [
+                    'ok' => true,
+                    'log' => implode("\n", $log),
+                    'hint' => 'Push berhasil melalui remote origin.',
+                ];
+            }
+
+            return ['ok' => false, 'log' => implode("\n", $log), 'hint' => 'Push melalui origin gagal.'];
+        }
+
+        if ($repo === '') {
+            $this->appendLog('GAGAL: repository wajib diisi.');
+
+            return ['ok' => false, 'log' => 'Repository wajib diisi.'];
         }
 
         // 1. Verifikasi token lebih dulu agar penyebab 403/401 langsung jelas.
@@ -255,7 +288,6 @@ class DeploymentService
         $this->appendLog('Verifikasi token: '.$check['message']);
 
         $log = ['Verifikasi token: '.$check['message']];
-
         // Perintah git tidak dijalankan bila dinonaktifkan (mis. pada pengujian).
         if (! config('surat.deployment.commands_enabled', true)) {
             $this->appendLog('Perintah git dilewati (DEPLOY_COMMANDS_ENABLED=false).');
@@ -327,6 +359,84 @@ class DeploymentService
         }
 
         return ['ok' => false, 'log' => implode("\n", $log), 'hint' => $diagnosis];
+    }
+
+    /**
+     * Tarik perubahan terbaru dari GitHub (untuk server/hosting).
+     *
+     * @return array{ok: bool, log: string, hint?: string}
+     */
+    public function pullFromGitHub(string $token, string $repo, string $branch): array
+    {
+        $this->appendLog('=== '.now()->format('Y-m-d H:i:s').' | Pull dari GitHub ===');
+
+        $repo = trim($repo);
+        $branch = trim($branch) ?: 'main';
+
+        if (! config('surat.deployment.commands_enabled', true)) {
+            $this->appendLog('Perintah git dilewati (DEPLOY_COMMANDS_ENABLED=false).');
+
+            return ['ok' => false, 'log' => 'Perintah git dinonaktifkan pada environment ini.'];
+        }
+
+        if ($repo === '') {
+            return ['ok' => false, 'log' => 'Repository belum diatur.'];
+        }
+
+        $log = [];
+        $remote = $token !== '' ? $this->authenticatedRemote($token, $repo) : 'origin';
+        $displayRemote = $token !== '' ? $this->maskSecrets($remote, [$token]) : 'origin';
+
+        // 1. Pastikan remote tersedia (pakai origin bila tanpa token).
+        if ($token === '' && ! $this->hasRemote('origin')) {
+            $this->appendLog('GAGAL: token kosong dan remote "origin" tidak tersedia.');
+
+            return ['ok' => false, 'log' => 'Isi token GitHub atau siapkan remote origin.'];
+        }
+
+        // 2. Tarik perubahan.
+        $command = ['git', 'pull', '--no-rebase', $remote, $branch];
+
+        $this->appendLog('$ git pull '.$displayRemote.' '.$branch);
+        $result = $this->runProcess($command, 300);
+        $masked = $this->maskSecrets($result['output'], [$token]);
+
+        $log[] = '$ git pull '.$displayRemote.' '.$branch;
+        $log[] = $masked;
+        $this->appendLog($masked);
+
+        if ($result['exitCode'] !== 0) {
+            $hint = $this->diagnosePullFailure($masked);
+            $this->appendLog('GAGAL: '.$hint);
+
+            return ['ok' => false, 'log' => implode("\n", $log), 'hint' => $hint];
+        }
+
+        $this->appendLog('SELESAI: perubahan terbaru berhasil ditarik.');
+
+        return [
+            'ok' => true,
+            'log' => implode("\n", $log),
+            'hint' => 'Perubahan terbaru berhasil ditarik dari GitHub.',
+        ];
+    }
+
+    /**
+     * Terjemahkan kegagalan pull menjadi panduan.
+     */
+    public function diagnosePullFailure(string $output): string
+    {
+        $lower = strtolower($output);
+
+        return match (true) {
+            str_contains($lower, 'local changes'), str_contains($lower, 'would be overwritten') => 'Server memiliki perubahan lokal yang belum di-commit. Commit atau simpan dulu sebelum pull.',
+            str_contains($lower, 'diverged'), str_contains($lower, 'unrelated histories') => 'Riwayat branch berbeda. Sinkronkan secara manual sekali di server.',
+            str_contains($lower, 'denied to'), str_contains($lower, '403') => 'Token tidak punya izin baca/tulis ke repository.',
+            str_contains($lower, 'bad credentials'), str_contains($lower, '401') => 'Token tidak valid atau kedaluwarsa.',
+            str_contains($lower, 'not found'), str_contains($lower, '404') => 'Repository/branch tidak ditemukan atau token tidak diberi akses.',
+            str_contains($lower, 'conflict') => 'Terjadi konflik merge. Selesaikan konflik di server lalu commit.',
+            default => 'Pull gagal. Periksa detail pada log di atas.',
+        };
     }
 
     /**
