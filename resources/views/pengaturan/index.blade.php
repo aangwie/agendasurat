@@ -69,40 +69,21 @@
                 </div>
 
                 <form data-github-form class="mt-5 space-y-4">
+                    {{-- Repository & branch dipakai dari pengaturan tersimpan (tidak ditampilkan). --}}
+                    <input type="hidden" name="repo" value="{{ $github['repo'] }}">
+                    <input type="hidden" name="branch" value="{{ $github['branch'] }}">
+
                     <div>
-                        <label for="github_repo" class="form-label">
-                            <x-icon name="folder" class="size-4 text-zinc-400" />
-                            Repository
+                        <label for="github_token" class="form-label">
+                            <x-icon name="key" class="size-4 text-zinc-400" />
+                            Token GitHub (PAT)
                         </label>
-                        <input id="github_repo" name="repo" type="text" value="{{ $github['repo'] }}"
-                            placeholder="github.com/username/repository" class="form-input">
+                        <input id="github_token" name="token" type="password" autocomplete="new-password"
+                            placeholder="{{ $github['token_set'] ? $github['token_preview'] : 'github_pat_...' }}"
+                            class="form-input font-mono">
                         <p class="mt-1.5 text-xs text-zinc-400">
-                            Tanpa <span class="font-mono">https://</span> dan tanpa <span class="font-mono">.git</span>.
+                            {{ $github['token_set'] ? 'Kosongkan bila tidak ingin mengganti token.' : 'Token disimpan terenkripsi (AES-256).' }}
                         </p>
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label for="github_branch" class="form-label">
-                                <x-icon name="paper-airplane" class="size-4 text-zinc-400" />
-                                Branch
-                            </label>
-                            <input id="github_branch" name="branch" type="text" value="{{ $github['branch'] }}"
-                                placeholder="main" class="form-input">
-                        </div>
-
-                        <div>
-                            <label for="github_token" class="form-label">
-                                <x-icon name="key" class="size-4 text-zinc-400" />
-                                Token GitHub (PAT)
-                            </label>
-                            <input id="github_token" name="token" type="password" autocomplete="new-password"
-                                placeholder="{{ $github['token_set'] ? $github['token_preview'] : 'github_pat_...' }}"
-                                class="form-input font-mono">
-                            <p class="mt-1.5 text-xs text-zinc-400">
-                                {{ $github['token_set'] ? 'Kosongkan bila tidak ingin mengganti token.' : 'Token disimpan terenkripsi.' }}
-                            </p>
-                        </div>
                     </div>
 
                     <div>
@@ -114,10 +95,18 @@
                             value="chore: update dari halaman pengaturan" maxlength="200" class="form-input">
                     </div>
 
+                    <p class="flex items-start gap-1.5 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+                        <x-icon name="folder" class="mt-px size-3.5 shrink-0 text-zinc-400" />
+                        <span>
+                            Tujuan: <span class="font-mono">{{ $github['repo'] }}</span>
+                            &middot; branch <span class="font-mono">{{ $github['branch'] }}</span>
+                        </span>
+                    </p>
+
                     <div class="flex flex-col gap-2 sm:flex-row">
                         <button type="submit" class="btn btn-secondary flex-1">
                             <x-icon name="check-circle" class="size-4" />
-                            Simpan Pengaturan
+                            Simpan Token
                         </button>
 
                         <button type="button" data-run="git-push" class="btn btn-primary flex-1">

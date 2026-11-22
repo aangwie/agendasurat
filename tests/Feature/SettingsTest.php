@@ -79,6 +79,46 @@ class SettingsTest extends TestCase
         $response->assertSee('Token tersimpan');
     }
 
+    public function test_the_settings_page_only_shows_the_token_field(): void
+    {
+        $content = $this->actingAs(User::factory()->admin()->create())
+            ->get('/pengaturan')
+            ->assertOk()
+            ->getContent();
+
+        // Input token tetap ada.
+        $this->assertStringContainsString('id="github_token"', $content);
+        $this->assertStringContainsString('name="token"', $content);
+
+        // Repository & branch tidak lagi berupa input yang dapat diedit.
+        $this->assertStringNotContainsString('id="github_repo"', $content);
+        $this->assertStringNotContainsString('id="github_branch"', $content);
+        $this->assertStringNotContainsString('name="repo" type="text"', $content);
+        $this->assertStringNotContainsString('name="branch" type="text"', $content);
+
+        // Nilainya tetap dikirim (hidden) dan ditampilkan sebagai info tujuan.
+        $this->assertStringContainsString('type="hidden" name="repo"', $content);
+        $this->assertStringContainsString('type="hidden" name="branch"', $content);
+        $this->assertStringContainsString('Tujuan:', $content);
+    }
+
+    public function test_saving_with_hidden_repository_and_branch_keeps_them(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->putJson('/pengaturan', [
+                'repo' => 'github.com/aangwie/agendasurat',
+                'branch' => 'main',
+                'token' => 'github_pat_baru',
+            ])
+            ->assertOk();
+
+        $this->assertSame('github.com/aangwie/agendasurat', AppSetting::get('github_repo'));
+        $this->assertSame('main', AppSetting::get('github_branch'));
+        $this->assertSame('github_pat_baru', AppSetting::getSecret('github_token'));
+    }
+
     public function test_only_whitelisted_actions_are_accepted(): void
     {
         $admin = User::factory()->admin()->create();
