@@ -281,6 +281,25 @@ Menu **Pengaturan** (khusus administrator) menyediakan:
 > (argumen terpisah) sehingga aman dari injeksi, dan hanya aksi yang ada di whitelist
 > yang diterima server.
 
+### Jika push ditolak (error 403 / 401)
+
+Tombol **Tes Token** memeriksa token lewat GitHub API sebelum push dan menampilkan
+penyebabnya secara spesifik:
+
+| Pesan | Arti & solusi |
+| --- | --- |
+| `401 Bad credentials` | Token salah/kedaluwarsa → buat token baru. |
+| `Token dikenali sebagai X, tetapi TIDAK punya izin tulis` | Fine-grained token belum diberi **Contents: Read and write**, atau repository belum dipilih pada *Repository access*. |
+| `404` | Token tidak diberi akses ke repository tersebut. |
+| `protected branch` | Branch dilindungi; push langsung ke branch itu ditolak. |
+
+Bila push via token gagal, aplikasi otomatis mencoba **jalur cadangan** `git push origin`
+(kredensial yang tersimpan di server) dan mencatatnya di log. Matikan jalur cadangan dengan
+`DEPLOY_ORIGIN_FALLBACK=false` pada `.env` bila tidak diinginkan.
+
+Untuk lingkungan pengujian, set `DEPLOY_COMMANDS_ENABLED=false` agar perintah git/artisan
+tidak dieksekusi (sudah diatur pada `phpunit.xml`).
+
 ## Aturan pengembangan
 
 - **Dilarang menghapus isi database** (users, profil instansi, surat masuk/keluar, klasifikasi)
