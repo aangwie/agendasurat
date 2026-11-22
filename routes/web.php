@@ -6,6 +6,7 @@ use App\Http\Controllers\IncomingLetterController;
 use App\Http\Controllers\InstitutionProfileController;
 use App\Http\Controllers\LetterClassificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -40,17 +41,17 @@ Route::middleware('auth')->group(function () {
         Route::put('pengguna/{pengguna}', [UserController::class, 'update'])->name('pengguna.update');
         Route::delete('pengguna/{pengguna}', [UserController::class, 'destroy'])->name('pengguna.destroy');
 
-        Route::view('pengaturan', 'modules.placeholder', [
-            'title' => 'Pengaturan',
-            'description' => 'Sesuaikan identitas instansi, format penomoran, dan preferensi aplikasi.',
-            'icon' => 'cog',
-            'features' => [
-                'Profil dan logo instansi',
-                'Format penomoran surat',
-                'Preferensi tampilan aplikasi',
-            ],
-        ])->name('pengaturan.index');
+        Route::get('pengaturan', [SettingsController::class, 'index'])->name('pengaturan.index');
+        Route::put('pengaturan', [SettingsController::class, 'update'])->name('pengaturan.update');
+        Route::post('pengaturan/aksi', [SettingsController::class, 'action'])->name('pengaturan.action');
+        Route::get('pengaturan/log', [SettingsController::class, 'log'])->name('pengaturan.log');
+        Route::delete('pengaturan/log', [SettingsController::class, 'clearLog'])->name('pengaturan.log.clear');
+        Route::post('pengaturan/backup', [SettingsController::class, 'backup'])->name('pengaturan.backup');
+        Route::get('pengaturan/backup/{filename}/unduh', [SettingsController::class, 'downloadBackup'])
+            ->name('pengaturan.backup.download');
+        Route::post('pengaturan/import', [SettingsController::class, 'import'])->name('pengaturan.import');
     });
+
     Route::get('surat-masuk', [IncomingLetterController::class, 'index'])->name('surat-masuk.index');
     Route::post('surat-masuk', [IncomingLetterController::class, 'store'])->name('surat-masuk.store');
     Route::put('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'update'])->name('surat-masuk.update');

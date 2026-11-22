@@ -22,6 +22,7 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
 - **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
 - **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, email, no HP, password + konfirmasi password; datatable dengan pencarian, slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
+- **Pengaturan (admin)**: update ke GitHub (token terenkripsi), tombol `migrate --force` / clear cache / symlink, backup & import database, serta terminal log aktivitas.
 - **Hak akses (admin)**: menu **Profil Instansi**, **Pengguna**, dan **Pengaturan** hanya terlihat dan
   dapat diakses oleh pengguna bertanda **Administrator** (selain itu menu disembunyikan dan URL
   mengembalikan 403). Administrator dapat menunjuk admin lain lewat checkbox di form Pengguna.
@@ -111,6 +112,11 @@ APP_TIMEZONE=Asia/Jakarta
 | `app/Http/Middleware/EnsureUserIsAdmin.php` | Middleware pembatas akses admin (menu sistem) |
 | `resources/js/csrf.js` | Penyegaran token CSRF + penanganan sesi berakhir (419) |
 | `resources/views/errors/419.blade.php` | Halaman ramah untuk error 419 Page Expired |
+| `app/Services/DeploymentService.php` | Eksekusi git push, artisan, backup/import database + log |
+| `app/Http/Controllers/SettingsController.php` | Halaman Pengaturan (admin) |
+| `app/Models/AppSetting.php` | Penyimpanan pengaturan (token terenkripsi) |
+| `resources/views/pengaturan/index.blade.php` | UI pengaturan + terminal log |
+| `resources/js/pengaturan.js` | Aksi pengaturan, konfirmasi SweetAlert2, terminal |
 | `app/Http/Controllers/UserController.php` | CRUD pengguna + datatable |
 | `app/Http/Requests/UserRequest.php` | Validasi pengguna (email unik, password + konfirmasi, no HP) |
 | `resources/views/pengguna/index.blade.php` | Halaman manajemen pengguna |
@@ -250,6 +256,29 @@ Folder `public/build` **tidak** di-ignore sehingga hasil `npm run build` ikut
 ter-upload ke GitHub. Server/hosting dapat langsung menjalankan aplikasi tanpa
 harus menjalankan Vite terlebih dahulu. Setelah mengubah CSS/JS, jalankan
 `npm run build` lalu commit folder `public/build`.
+
+## Halaman Pengaturan (admin)
+
+Menu **Pengaturan** (khusus administrator) menyediakan:
+
+- **Update ke GitHub** — simpan repository, branch, dan **Personal Access Token (PAT)**.
+  Token disimpan **terenkripsi** di tabel `app_settings` dan hanya ditampilkan tersamar.
+  Tombol *Update ke GitHub* menjalankan `git add` → `git commit` → `git push` memakai token,
+  dengan konfirmasi SweetAlert2. Token disamarkan (`***`) pada log.
+- **Perintah Artisan** — tombol untuk `php artisan migrate --force`,
+  `php artisan optimize:clear`, dan `php artisan storage:link`.
+- **Backup Database** — membuat berkas `.sql` di `storage/app/backups` (di-ignore git) dan
+  mengunduhnya lewat tautan.
+- **Import Database** — unggah `.sql` (maks 50 MB). Sistem **otomatis membuat backup
+  pengaman** sebelum menimpa data, dan konfirmasi SweetAlert2 wajib disetujui.
+- **Terminal log** — panel gelap di bawah halaman yang menampilkan output perintah
+  (tersimpan di `storage/logs/deploy.log`), lengkap dengan status, muat ulang, dan bersihkan log.
+
+> **Penting:** isi token dengan PAT GitHub asli (format `github_pat_...`) yang memiliki izin
+> `Contents: Read and write` pada repository tujuan. Nilai `github_patxxxxxxxxxxxxxxxxxxx`
+> hanyalah contoh — ganti dengan token Anda sendiri. Perintah dijalankan tanpa shell
+> (argumen terpisah) sehingga aman dari injeksi, dan hanya aksi yang ada di whitelist
+> yang diterima server.
 
 ## Aturan pengembangan
 
