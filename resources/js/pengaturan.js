@@ -4,9 +4,9 @@
  */
 const CONFIRMATIONS = {
     'git-pull': {
-        title: 'Pull dari GitHub?',
+        title: 'Update Sistem?',
         text: 'Server ini akan mengambil perubahan terbaru dari repository. Lanjutkan?',
-        confirm: 'Ya, pull',
+        confirm: 'Ya, update',
         icon: 'question',
     },
     migrate: {
@@ -30,7 +30,7 @@ const CONFIRMATIONS = {
 };
 
 const LABELS = {
-    'git-pull': 'Pull dari GitHub',
+    'git-pull': 'Update Sistem',
     migrate: 'Migrasi database',
     'clear-cache': 'Bersihkan cache',
     symlink: 'Buat symlink',

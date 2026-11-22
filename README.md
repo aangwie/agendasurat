@@ -271,10 +271,10 @@ Menu **Pengaturan** (khusus administrator) menyediakan:
   tersimpan (ditampilkan sebagai info tujuan, bukan input). Token disimpan **terenkripsi**
   di tabel `app_settings` dan hanya ditampilkan tersamar.
 
-  Aplikasi hanya melakukan **Pull**: tombol *Pull dari GitHub* menjalankan `git pull`
+  Aplikasi hanya melakukan **Pull**: tombol **Update Sistem** menjalankan `git pull`
   untuk mengambil perubahan terbaru dari repository ke server, dengan konfirmasi
   SweetAlert2. Token disamarkan (`***`) pada log. Tombol **Tes Token** memeriksa izin
-  baca sebelum pull. Push dilakukan dari komputer pengembang (`git push`), bukan dari aplikasi.
+  baca sebelum update. Push dilakukan dari komputer pengembang (`git push`), bukan dari aplikasi.
 - **Perintah Artisan** — tombol untuk `php artisan migrate --force`,
   `php artisan optimize:clear`, dan `php artisan storage:link`.
 - **Backup Database** — membuat berkas `.sql` di `storage/app/backups` (di-ignore git) dan

@@ -103,35 +103,31 @@
                         </span>
                     </p>
 
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                        <button type="submit" class="btn btn-secondary flex-1">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button type="submit"
+                            class="btn w-full border border-zinc-800 bg-zinc-900 py-3 text-white shadow-sm shadow-zinc-900/20 hover:bg-zinc-800">
                             <x-icon name="check-circle" class="size-4" />
                             Simpan Token
                         </button>
 
-                        <button type="button" data-verify="git-verify" class="btn btn-secondary flex-1">
+                        <button type="button" data-verify="git-verify"
+                            class="btn w-full border border-amber-300 bg-amber-400 py-3 text-amber-950 shadow-sm shadow-amber-500/25 hover:bg-amber-300">
                             <x-icon name="shield-check" class="size-4" />
                             Tes Token
                         </button>
                     </div>
 
                     <button type="button" data-run="git-pull"
-                        class="flex w-full flex-col items-start gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100">
-                        <span class="flex items-center gap-2 text-sm font-semibold text-emerald-700">
-                            <x-icon name="arrow-down-tray" class="size-4" />
-                            Pull dari GitHub
-                        </span>
-                        <span class="text-[11px] leading-relaxed text-emerald-700/80">
-                            Ambil perubahan terbaru dari GitHub ke server ini.
-                        </span>
+                        class="btn w-full border border-emerald-700 bg-emerald-600 py-3 text-white shadow-sm shadow-emerald-600/25 hover:bg-emerald-500">
+                        <x-icon name="arrow-down-tray" class="size-4" />
+                        Update Sistem
                     </button>
 
                     <p class="flex items-start gap-1.5 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
                         <x-icon name="sparkles" class="mt-px size-3.5 shrink-0 text-zinc-400" />
                         <span>
-                            Alur: push dilakukan dari komputer pengembang, lalu
-                            <span class="font-semibold text-zinc-700">Pull</span> di halaman ini, dan jalankan
-                            migrasi bila ada perubahan database.
+                            <span class="font-semibold text-zinc-700">Update Sistem</span> menarik perubahan terbaru
+                            dari GitHub ke server ini. Jalankan migrasi setelahnya bila ada perubahan database.
                         </span>
                     </p>
                 </form>
