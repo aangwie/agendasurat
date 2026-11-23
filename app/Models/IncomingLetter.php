@@ -24,6 +24,13 @@ class IncomingLetter extends Model
     ];
 
     /**
+     * Kode bidang yang berhak mencatat surat masuk (Subbagian Umum dan Kepegawaian).
+     *
+     * Pengguna lain hanya dapat membaca dan mencetak.
+     */
+    public const MANAGER_KODE_BIDANG = '408.37.01';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>

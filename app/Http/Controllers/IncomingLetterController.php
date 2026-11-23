@@ -50,6 +50,8 @@ class IncomingLetterController extends Controller
                 ->whereBetween('received_date', [now()->startOfMonth(), now()->endOfMonth()])
                 ->count(),
             'suggestedAgendaNumber' => IncomingLetter::suggestAgendaNumber(),
+            // Akun bidang lain hanya boleh membaca (tombol tambah/edit/hapus disembunyikan).
+            'canManage' => $request->user()->canManageIncomingLetters(),
             'openForm' => session('open_form'),
             'openFormId' => session('open_form_id'),
         ];

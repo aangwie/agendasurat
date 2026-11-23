@@ -39,6 +39,7 @@ class UserController extends Controller
 
                 $query->where(function ($query) use ($like) {
                     $query->where('name', 'like', $like)
+                        ->orWhere('kode_bidang', 'like', $like)
                         ->orWhere('email', 'like', $like)
                         ->orWhere('phone', 'like', $like);
                 });
@@ -72,6 +73,7 @@ class UserController extends Controller
     {
         $user = User::create([
             'name' => $request->validated('name'),
+            'kode_bidang' => $request->validated('kode_bidang'),
             'email' => $request->validated('email'),
             'phone' => $request->validated('phone'),
             'password' => Hash::make($request->validated('password')),
@@ -108,6 +110,7 @@ class UserController extends Controller
 
         $data = [
             'name' => $request->validated('name'),
+            'kode_bidang' => $request->validated('kode_bidang'),
             'email' => $request->validated('email'),
             'phone' => $request->validated('phone'),
             'is_admin' => $wantsAdmin,

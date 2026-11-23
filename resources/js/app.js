@@ -8,6 +8,8 @@ import { initDateDisplays } from './date-display';
 import { initCsrfProtection } from './csrf';
 import { initSettingsPage } from './pengaturan';
 import { initAgendas } from './agenda';
+import { initOutgoingLetters } from './surat-keluar';
+import { initSearchableSelects } from './searchable-select';
 
 // Dipakai juga oleh modul lain (mis. penanganan sesi berakhir di csrf.js).
 window.Swal = Swal;
@@ -315,6 +317,8 @@ onReady(() => {
     initUserManagement();
     initSettingsPage();
     initAgendas();
+    initSearchableSelects();
+    initOutgoingLetters();
     initDateDisplays();
 
     /**

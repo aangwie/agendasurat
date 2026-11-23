@@ -57,6 +57,10 @@
                                     class="font-semibold text-zinc-700">{{ $letterDatePreview }}</span>
                             </p>
 
+                            <p class="mt-1 text-xs text-zinc-400">
+                                Boleh diisi tanggal yang akan datang bila surat baru akan diterbitkan.
+                            </p>
+
                             <x-form-error field="letter_date" />
                         </div>
 

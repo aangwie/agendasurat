@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\IncomingLetterController;
 use App\Http\Controllers\InstitutionProfileController;
 use App\Http\Controllers\LetterClassificationController;
+use App\Http\Controllers\OutgoingLetterController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
@@ -53,22 +54,21 @@ Route::middleware('auth')->group(function () {
         Route::post('pengaturan/import', [SettingsController::class, 'import'])->name('pengaturan.import');
     });
 
+    // Semua pengguna boleh membaca & mencetak surat masuk.
     Route::get('surat-masuk', [IncomingLetterController::class, 'index'])->name('surat-masuk.index');
-    Route::post('surat-masuk', [IncomingLetterController::class, 'store'])->name('surat-masuk.store');
-    Route::put('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'update'])->name('surat-masuk.update');
-    Route::delete('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'destroy'])->name('surat-masuk.destroy');
     Route::get('surat-masuk/{incomingLetter}/cetak', [IncomingLetterController::class, 'print'])->name('surat-masuk.cetak');
 
-    Route::view('surat-keluar', 'modules.placeholder', [
-        'title' => 'Surat Keluar',
-        'description' => 'Kelola penomoran, pembuatan, dan pengiriman surat keluar instansi secara tertib.',
-        'icon' => 'paper-airplane',
-        'features' => [
-            'Penomoran surat keluar otomatis',
-            'Template surat dinas siap pakai',
-            'Riwayat pengiriman dan arsip digital',
-        ],
-    ])->name('surat-keluar.index');
+    // Pencatatan surat masuk hanya untuk Subbag Umum & Kepegawaian dan admin.
+    Route::middleware('surat-masuk.manage')->group(function () {
+        Route::post('surat-masuk', [IncomingLetterController::class, 'store'])->name('surat-masuk.store');
+        Route::put('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'update'])->name('surat-masuk.update');
+        Route::delete('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'destroy'])->name('surat-masuk.destroy');
+    });
+
+    Route::get('surat-keluar', [OutgoingLetterController::class, 'index'])->name('surat-keluar.index');
+    Route::post('surat-keluar', [OutgoingLetterController::class, 'store'])->name('surat-keluar.store');
+    Route::put('surat-keluar/{outgoingLetter}', [OutgoingLetterController::class, 'update'])->name('surat-keluar.update');
+    Route::delete('surat-keluar/{outgoingLetter}', [OutgoingLetterController::class, 'destroy'])->name('surat-keluar.destroy');
 
     Route::view('surat-tugas', 'modules.placeholder', [
         'title' => 'Surat Tugas',

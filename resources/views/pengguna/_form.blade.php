@@ -28,15 +28,23 @@
                 <input type="hidden" name="_method" value="" data-method-input disabled>
 
                 <div class="space-y-4 px-5 py-5 sm:px-6">
-                    <x-input-field name="name" label="Nama Bidang" icon="building-office"
-                        placeholder="Contoh: Bidang Pendidikan Dasar" maxlength="150" />
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="sm:col-span-2">
+                            <x-input-field name="name" label="Nama Bidang" icon="building-office"
+                                placeholder="Contoh: Bidang Pendidikan Dasar" maxlength="150" />
+                        </div>
+
+                        <x-input-field name="kode_bidang" label="Kode Bidang" icon="key"
+                            placeholder="408.37.06" maxlength="30" :required="false"
+                            hint="Kode register bidang, boleh dikosongkan." />
+                    </div>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <x-input-field name="email" label="Email" icon="at-symbol" type="email"
                             placeholder="bidang@instansi.go.id" inputmode="email" maxlength="150" />
 
                         <x-input-field name="phone" label="No HP" icon="user" placeholder="081234567890"
-                            inputmode="tel" maxlength="30" />
+                            inputmode="tel" maxlength="30" :required="false" hint="Boleh dikosongkan." />
                     </div>
 
                     <div>

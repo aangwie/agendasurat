@@ -32,13 +32,14 @@
 </div>
 
 <div class="overflow-x-auto">
-    <table class="w-full min-w-[52rem] text-left text-sm">
+    <table class="w-full min-w-[58rem] text-left text-sm">
         <caption class="sr-only">Daftar pengguna aplikasi</caption>
 
         <thead class="border-b border-zinc-100 bg-white text-[10px] tracking-wider text-zinc-500 uppercase">
             <tr>
                 <th scope="col" class="w-14 px-4 py-3 font-semibold">No.</th>
                 <th scope="col" class="px-4 py-3 font-semibold">Nama Bidang</th>
+                <th scope="col" class="w-32 px-4 py-3 font-semibold">Kode Bidang</th>
                 <th scope="col" class="px-4 py-3 font-semibold">Email</th>
                 <th scope="col" class="w-44 px-4 py-3 font-semibold">No HP</th>
                 <th scope="col" class="w-28 px-4 py-3 text-center font-semibold">Aksi</th>
@@ -80,6 +81,17 @@
                         </div>
                     </td>
 
+                    <td class="px-4 py-3 align-top whitespace-nowrap">
+                        @if ($user->kode_bidang)
+                            <span
+                                class="inline-flex rounded-md bg-zinc-100 px-2 py-0.5 font-mono text-[12px] font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                                {{ $user->kode_bidang }}
+                            </span>
+                        @else
+                            <span class="text-xs text-zinc-300">—</span>
+                        @endif
+                    </td>
+
                     <td class="px-4 py-3 align-top">
                         <span class="text-zinc-600">{{ $user->email }}</span>
                     </td>
@@ -96,7 +108,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-14 text-center">
+                    <td colspan="6" class="px-6 py-14 text-center">
                         <span class="mx-auto grid size-12 place-items-center rounded-full bg-zinc-100 text-zinc-400">
                             <x-icon name="users" class="size-6" />
                         </span>

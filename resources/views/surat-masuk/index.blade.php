@@ -85,10 +85,18 @@
                     <button type="submit" class="btn btn-primary py-2.5">Cari</button>
                 </form>
 
-                <button type="button" data-letter-open="create" class="btn btn-primary">
-                    <x-icon name="plus" class="size-4" />
-                    Tambah Surat Masuk
-                </button>
+                @if ($canManage)
+                    <button type="button" data-letter-open="create" class="btn btn-primary">
+                        <x-icon name="plus" class="size-4" />
+                        Tambah Surat Masuk
+                    </button>
+                @else
+                    <p
+                        class="flex items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600">
+                        <x-icon name="lock" class="mt-px size-3.5 shrink-0" />
+                        Anda hanya dapat melihat dan mencetak surat masuk.
+                    </p>
+                @endif
             </div>
         </section>
 
@@ -100,6 +108,8 @@
             </div>
         </section>
 
-        @include('surat-masuk._form')
+        @if ($canManage)
+            @include('surat-masuk._form')
+        @endif
     </div>
 </x-layouts.app>

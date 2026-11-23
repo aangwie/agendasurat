@@ -27,6 +27,7 @@ class UserRequest extends FormRequest
 
         $this->merge([
             'name' => trim((string) $this->input('name')),
+            'kode_bidang' => trim((string) $this->input('kode_bidang')) ?: null,
             'email' => mb_strtolower(trim((string) $this->input('email'))),
             'phone' => $phone === '' ? null : $phone,
         ]);
@@ -44,6 +45,13 @@ class UserRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:150'],
+            'kode_bidang' => [
+                'nullable',
+                'string',
+                'max:30',
+                'regex:/^[0-9]{1,4}(\.[0-9]{1,4}){0,3}$/',
+                Rule::unique('users', 'kode_bidang')->ignore($user?->id),
+            ],
             'email' => [
                 'required',
                 'string',
@@ -51,7 +59,7 @@ class UserRequest extends FormRequest
                 'max:150',
                 Rule::unique('users', 'email')->ignore($user?->id),
             ],
-            'phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[0-9]{7,13}$/'],
+            'phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[0-9]{7,13}$/'],
             'password' => $isUpdate
                 ? ['nullable', 'string', Password::min(8), 'confirmed']
                 : ['required', 'string', Password::min(8), 'confirmed'],
@@ -69,10 +77,12 @@ class UserRequest extends FormRequest
         return [
             'name.required' => 'Nama bidang wajib diisi.',
             'name.max' => 'Nama bidang maksimal 150 karakter.',
+            'kode_bidang.max' => 'Kode bidang maksimal 30 karakter.',
+            'kode_bidang.regex' => 'Kode bidang tidak valid. Contoh: 408.37.06.',
+            'kode_bidang.unique' => 'Kode bidang tersebut sudah dipakai pengguna lain.',
             'email.required' => 'Email wajib diisi.',
             'email.email' => 'Format email tidak valid.',
             'email.unique' => 'Email tersebut sudah dipakai pengguna lain.',
-            'phone.required' => 'No HP wajib diisi.',
             'phone.regex' => 'No HP tidak valid. Contoh: 081234567890.',
             'password.required' => 'Password wajib diisi.',
             'password.min' => 'Password minimal 8 karakter.',
@@ -89,6 +99,7 @@ class UserRequest extends FormRequest
     {
         return [
             'name' => 'nama bidang',
+            'kode_bidang' => 'kode bidang',
             'email' => 'email',
             'phone' => 'no hp',
             'password' => 'password',

@@ -131,7 +131,7 @@
                     Modul bertahap
                 </div>
                 <p class="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                    Surat masuk, surat keluar, surat tugas, dan agenda akan aktif pada tahap pengembangan berikutnya.
+                    Surat tugas dan laporan akan aktif pada tahap pengembangan berikutnya.
                 </p>
             </div>
 

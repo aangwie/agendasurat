@@ -57,6 +57,7 @@ class BidangUserSeeder extends Seeder
                 ['email' => $email],
                 [
                     'name' => $bidang['name'],
+                    'kode_bidang' => $bidang['code'],
                     'password' => Hash::make(self::PASSWORD),
                     'email_verified_at' => now(),
                     'is_admin' => false,

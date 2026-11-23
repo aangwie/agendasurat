@@ -22,6 +22,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'kode_bidang',
         'email',
         'password',
         'phone',
@@ -58,6 +59,18 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return (bool) $this->is_admin;
+    }
+
+    /**
+     * Apakah pengguna berhak mencatat/mengubah surat masuk?
+     *
+     * Hanya administrator dan akun Subbagian Umum dan Kepegawaian (408.37.01)
+     * yang diizinkan; akun bidang lain bersifat hanya-baca.
+     */
+    public function canManageIncomingLetters(): bool
+    {
+        return $this->isAdmin()
+            || $this->kode_bidang === IncomingLetter::MANAGER_KODE_BIDANG;
     }
 
     /**

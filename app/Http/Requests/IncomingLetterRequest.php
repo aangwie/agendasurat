@@ -15,7 +15,10 @@ class IncomingLetterRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        $user = $this->user();
+
+        // Hanya Subbag Umum & Kepegawaian (408.37.01) dan admin yang boleh mencatat.
+        return $user !== null && $user->canManageIncomingLetters();
     }
 
     /**
@@ -54,7 +57,7 @@ class IncomingLetterRequest extends FormRequest
                 Rule::unique('incoming_letters', 'agenda_number')->ignore($letter?->id),
             ],
             'received_date' => ['required', 'date', 'before_or_equal:today'],
-            'letter_date' => ['required', 'date', 'before_or_equal:today'],
+            'letter_date' => ['required', 'date'],
             'letter_number' => ['required', 'string', 'max:100'],
             'sender' => ['required', 'string', 'max:150'],
             'subject' => ['required', 'string', 'max:255'],
@@ -79,7 +82,6 @@ class IncomingLetterRequest extends FormRequest
             'received_date.before_or_equal' => 'Tanggal diterima tidak boleh melebihi hari ini.',
             'letter_date.required' => 'Tanggal surat wajib diisi.',
             'letter_date.date' => 'Tanggal surat tidak valid.',
-            'letter_date.before_or_equal' => 'Tanggal surat tidak boleh melebihi hari ini.',
             'letter_number.required' => 'Nomor surat wajib diisi.',
             'letter_number.max' => 'Nomor surat maksimal 100 karakter.',
             'sender.required' => 'Asal surat wajib diisi.',

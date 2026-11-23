@@ -21,8 +21,9 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
   Surat Masuk (merah `#e11d48`), Surat Keluar (biru laut `#1e3a8a`), Surat Tugas (kuning tua `#ca8a04`).
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
 - **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
+- **Surat Keluar**: penomoran berjenjang **Tahun → Bulan → Kode → Subkode** (kombinasi unik per tahun) dengan input **Nomor Surat Keluar**, **Perihal**, dan **Tanggal Surat**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon edit & hapus (konfirmasi SweetAlert2) hanya untuk pembuat surat dan administrator.
 - **Agenda**: input **Tanggal, Tempat, Penanggung Jawab, Peserta**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **edit** & **hapus** (konfirmasi SweetAlert2).
-- **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, email, no HP, password + konfirmasi password; datatable dengan pencarian, slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
+- **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, kode bidang (format register, mis. `408.37.06`), email, no HP (opsional), password + konfirmasi password; datatable dengan pencarian (termasuk kode bidang), slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
 - **Pengaturan (admin)**: pull dari GitHub (token terenkripsi), tombol `migrate --force` / clear cache / symlink, backup & import database, serta terminal log aktivitas.
 - **Hak akses (admin)**: menu **Profil Instansi**, **Pengguna**, dan **Pengaturan** hanya terlihat dan
   dapat diakses oleh pengguna bertanda **Administrator** (selain itu menu disembunyikan dan URL
@@ -110,6 +111,11 @@ APP_TIMEZONE=Asia/Jakarta
 | `resources/js/datatable.js` | Datatable generik (pencarian, slice, pagination) |
 | `resources/js/date-display.js` | Format tanggal Indonesia (`12 Agustus 2026`) untuk input tanggal |
 | `resources/js/surat-masuk.js` | Modal tambah/edit + buka ulang saat validasi gagal |
+| `app/Http/Controllers/OutgoingLetterController.php` | Datatable + CRUD surat keluar (penomoran tahun/kode/subkode) |
+| `app/Http/Requests/OutgoingLetterRequest.php` | Validasi surat keluar (nomor, perihal, tanggal, keunikan kode) |
+| `app/Models/OutgoingLetter.php` | Model surat keluar + kode bulanan & subkode |
+| `resources/views/surat-keluar/` | Halaman surat keluar (index, tabel, form modal, aksi) |
+| `resources/js/surat-keluar.js` | Modal surat keluar + hierarki tahun > bulan > kode > subkode |
 | `app/Http/Middleware/EnsureUserIsAdmin.php` | Middleware pembatas akses admin (menu sistem) |
 | `resources/js/csrf.js` | Penyegaran token CSRF + penanganan sesi berakhir (419) |
 | `resources/views/errors/419.blade.php` | Halaman ramah untuk error 419 Page Expired |
@@ -195,11 +201,17 @@ urutan field: **Tanggal Surat**, **Nomor Surat**, **Asal Surat**, **Perihal**,
 
 - Tanggal surat ditampilkan dengan format Indonesia, contoh **12 Agustus 2026**
   (berlaku pada tabel, lembar cetak, dan pratinjau di formulir).
+- **Tanggal surat boleh melebihi hari ini** karena surat dapat diterbitkan di kemudian
+  hari, sedangkan **tanggal diterima** tidak boleh melebihi hari ini.
 - **Sifat Surat** berupa checkbox: *Segera/Penting*, *Terbuka*, dan *Rahasia*
   (boleh lebih dari satu, boleh dikosongkan). Nilai disimpan sebagai JSON dan
   ditampilkan sebagai badge pada tabel serta label pada lembar cetak.
 - Nomor agenda disarankan otomatis dengan format `SM/{tahun}/{urut}` dan divalidasi unik.
-- Tanggal diterima dan tanggal surat tidak boleh melebihi hari ini.
+- **Hak akses**: hanya **Subbagian Umum dan Kepegawaian** (kode bidang `408.37.01`)
+  dan **administrator** yang dapat menambah, mengubah, dan menghapus surat masuk.
+  Akun bidang lain bersifat **hanya-baca**: tetap bisa melihat tabel, mencari,
+  dan mencetak lembar disposisi, tetapi tombol tambah/edit/hapus disembunyikan
+  dan permintaan tulis ditolak dengan `403`.
 - Datatable: pencarian (nomor agenda, nomor surat, asal surat, perihal), slice data
   10/25/50/100 baris, dan pagination — semuanya berjalan lewat AJAX.
 - Aksi per baris memakai ikon: **cetak** (`printer`), **edit** (`pencil`), dan
@@ -233,6 +245,43 @@ Data contoh opsional (28 baris) untuk mencoba datatable:
 ```bash
 php artisan db:seed --class=IncomingLetterSeeder
 ```
+
+## Surat keluar
+
+Halaman **Surat Keluar** (`/surat-keluar`) mencatat surat yang diterbitkan instansi.
+Nomor urut dipilih berjenjang: **Tahun → Bulan → Kode (00–35) → Subkode (01–99)**,
+lalu diisi **Nomor Surat Keluar**, **Perihal**, dan **Tanggal Surat**.
+
+Nomor surat **tidak diketik penuh**. Cukup isi **kode depan** (mis. `400.3.5`),
+lalu sistem menyusun nomor lengkap dengan pola:
+
+```
+kode depan / kode+subkode / kode bidang / tahun
+```
+
+Contoh: kode depan `400.3.5`, kode `03`, subkode `56`, kode bidang akun `408.37.06`,
+dan tahun `2026` menghasilkan **`400.3.5/0356/408.37.06/2026`**. Nilai inilah yang
+disimpan pada kolom `letter_number` dan ditampilkan di tabel. Formulir menampilkan
+pratinjau nomor lengkap secara langsung saat kode depan/tahun/bulan/kode/subkode diubah.
+
+- Setiap tahun memiliki 3 kode per bulan (Januari `00–02` … Desember `33–35`).
+  Kombinasi tahun + kode + subkode tidak boleh dipakai dua kali; kode/subkode yang
+  sudah terpakai otomatis dinonaktifkan pada formulir.
+- **Kode depan** wajib diisi (maks. 50 karakter) dan hanya boleh berisi huruf, angka,
+  titik, serta tanda hubung — garis miring tidak dipakai agar nomor tetap 4 bagian.
+- **Kode bidang** otomatis diambil dari kode bidang akun pembuat (`users.kode_bidang`).
+  Akun tanpa kode bidang akan ditolak dengan pesan agar administrator melengkapinya.
+- **Perihal** wajib diisi (maks. 255 karakter) dan **Tanggal Surat** wajib diisi.
+  Tanggal surat **boleh melebihi hari ini** karena surat dapat diterbitkan di kemudian
+  hari. Tanggal ditampilkan dalam format Indonesia, contoh **12 Agustus 2026**
+  (tabel dan pratinjau formulir).
+- **Bidang** otomatis diambil dari akun pembuat surat, bukan input bebas.
+- Saat mengedit, nomor urut (tahun/kode/subkode) dan kode bidang tetap; hanya kode
+  depan, perihal, dan tanggal surat yang dapat diubah. Nomor lengkap disusun ulang
+  otomatis dari komponen tersebut.
+- Datatable: pencarian (nomor surat, kode depan, kode bidang, perihal, bidang, kode,
+  pembuat), slice data 10/25/50/100 baris, dan pagination via AJAX. Aksi ikon **edit**
+  dan **hapus** (konfirmasi SweetAlert2) hanya tampil untuk pembuat surat dan administrator.
 
 ## Penanganan 419 Page Expired
 

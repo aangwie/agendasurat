@@ -38,7 +38,7 @@
                             class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400" />
 
                         <input type="search" name="q" value="{{ $search }}" data-table-search
-                            placeholder="Cari nama bidang, email, atau no HP..." aria-label="Cari pengguna"
+                            placeholder="Cari nama bidang, kode bidang, email, atau no HP..." aria-label="Cari pengguna"
                             class="form-input py-2.5 pr-10 pl-10">
 
                         <span data-table-spinner

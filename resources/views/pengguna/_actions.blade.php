@@ -6,6 +6,7 @@
     data-user-payload="{{ json_encode([
         'id' => $user->id,
         'name' => $user->name,
+        'kode_bidang' => $user->kode_bidang,
         'email' => $user->email,
         'phone' => $user->phone,
         'is_admin' => (bool) $user->is_admin,

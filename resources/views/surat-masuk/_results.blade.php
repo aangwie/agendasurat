@@ -127,8 +127,10 @@
                         <p class="mt-1 text-xs text-zinc-500">
                             @if ($search !== '')
                                 Tidak ada data yang cocok dengan “{{ $search }}”.
-                            @else
+                            @elseif ($canManage)
                                 Mulai catat surat masuk pertama Anda.
+                            @else
+                                Belum ada surat masuk yang tercatat.
                             @endif
                         </p>
 
@@ -138,7 +140,7 @@
                                 <x-icon name="x-mark" class="size-4" />
                                 Bersihkan pencarian
                             </a>
-                        @else
+                        @elseif ($canManage)
                             <button type="button" class="btn btn-primary mt-4" data-letter-open="create">
                                 <x-icon name="plus" class="size-4" />
                                 Tambah Surat Masuk

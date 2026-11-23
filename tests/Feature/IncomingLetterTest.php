@@ -31,6 +31,32 @@ class IncomingLetterTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * Akun Subbagian Umum dan Kepegawaian (408.37.01) yang boleh mencatat surat masuk.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function manager(array $attributes = []): User
+    {
+        return User::factory()->create(array_merge([
+            'name' => 'Subbagian Umum dan Kepegawaian / Tata Usaha',
+            'kode_bidang' => IncomingLetter::MANAGER_KODE_BIDANG,
+        ], $attributes));
+    }
+
+    /**
+     * Akun bidang lain yang hanya boleh membaca surat masuk.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function reader(array $attributes = []): User
+    {
+        return User::factory()->create(array_merge([
+            'name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'kode_bidang' => '408.37.03',
+        ], $attributes));
+    }
+
     public function test_guests_are_redirected_to_the_login_screen(): void
     {
         $this->get('/surat-masuk')->assertRedirect(route('login'));
@@ -41,7 +67,7 @@ class IncomingLetterTest extends TestCase
     {
         IncomingLetter::create($this->payload());
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->get('/surat-masuk')
             ->assertOk()
             ->assertSee('Nomor Agenda')
@@ -62,7 +88,7 @@ class IncomingLetterTest extends TestCase
 
     public function test_an_incoming_letter_can_be_stored(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->post('/surat-masuk', $this->payload())
             ->assertRedirect(route('surat-masuk.index'))
             ->assertSessionHas('status');
@@ -83,7 +109,7 @@ class IncomingLetterTest extends TestCase
 
     public function test_sifat_supports_multiple_checkboxes_and_can_be_cleared(): void
     {
-        $user = User::factory()->create();
+        $user = $this->manager();
 
         $this->actingAs($user)->post('/surat-masuk', $this->payload([
             'sifat' => ['segera', 'rahasia'],
@@ -102,7 +128,7 @@ class IncomingLetterTest extends TestCase
 
     public function test_sifat_must_use_the_available_options(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->post('/surat-masuk', $this->payload(['sifat' => ['biasa']]))
             ->assertSessionHasErrors('sifat.0');
     }
@@ -133,7 +159,7 @@ class IncomingLetterTest extends TestCase
 
     public function test_the_form_fields_follow_the_requested_order(): void
     {
-        $content = $this->actingAs(User::factory()->create())
+        $content = $this->actingAs($this->manager())
             ->get('/surat-masuk')
             ->assertOk()
             ->getContent();
@@ -167,7 +193,7 @@ class IncomingLetterTest extends TestCase
 
     public function test_storing_requires_all_fields(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->post('/surat-masuk', [])
             ->assertSessionHasErrors([
                 'agenda_number',
@@ -180,13 +206,26 @@ class IncomingLetterTest extends TestCase
             ->assertSessionHas('open_form', 'create');
     }
 
-    public function test_the_letter_date_is_required_and_cannot_be_in_the_future(): void
+    public function test_the_letter_date_is_required(): void
     {
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->post('/surat-masuk', $this->payload(['letter_date' => now()->addWeek()->format('Y-m-d')]))
+        $this->actingAs($this->manager())
+            ->post('/surat-masuk', $this->payload(['letter_date' => '']))
             ->assertSessionHasErrors('letter_date');
+    }
+
+    public function test_the_letter_date_may_be_in_the_future(): void
+    {
+        $futureDate = now()->addWeek()->format('Y-m-d');
+
+        $this->actingAs($this->manager())
+            ->post('/surat-masuk', $this->payload(['letter_date' => $futureDate]))
+            ->assertRedirect(route('surat-masuk.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('incoming_letters', [
+            'agenda_number' => 'SM/2026/001',
+            'letter_date' => $futureDate.' 00:00:00',
+        ]);
     }
 
     public function test_the_letter_date_is_shown_in_indonesian_format(): void
@@ -224,14 +263,14 @@ class IncomingLetterTest extends TestCase
     {
         IncomingLetter::create($this->payload());
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->post('/surat-masuk', $this->payload(['letter_number' => '999/999/XXX/2026']))
             ->assertSessionHasErrors('agenda_number');
     }
 
     public function test_the_received_date_cannot_be_in_the_future(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->post('/surat-masuk', $this->payload(['received_date' => now()->addWeek()->format('Y-m-d')]))
             ->assertSessionHasErrors('received_date');
     }
@@ -240,7 +279,7 @@ class IncomingLetterTest extends TestCase
     {
         $letter = IncomingLetter::create($this->payload());
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->put("/surat-masuk/{$letter->id}", $this->payload([
                 'sender' => 'Inspektorat Daerah',
                 'subject' => 'Permohonan Data Rekapitulasi Surat',
@@ -259,12 +298,72 @@ class IncomingLetterTest extends TestCase
     {
         $letter = IncomingLetter::create($this->payload());
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($this->manager())
             ->delete("/surat-masuk/{$letter->id}")
             ->assertRedirect(route('surat-masuk.index'))
             ->assertSessionHas('status');
 
         $this->assertDatabaseMissing('incoming_letters', ['id' => $letter->id]);
+    }
+
+    public function test_only_the_subbagian_umum_account_and_admins_can_write(): void
+    {
+        $letter = IncomingLetter::create($this->payload());
+
+        // Akun bidang lain hanya boleh membaca: tambah/ubah/hapus ditolak.
+        $reader = $this->reader();
+
+        $this->actingAs($reader)
+            ->post('/surat-masuk', $this->payload(['agenda_number' => 'SM/2026/002']))
+            ->assertForbidden();
+
+        $this->actingAs($reader)
+            ->put("/surat-masuk/{$letter->id}", $this->payload(['sender' => 'Diubah Pembaca']))
+            ->assertForbidden();
+
+        $this->actingAs($reader)
+            ->delete("/surat-masuk/{$letter->id}")
+            ->assertForbidden();
+
+        $this->assertSame(1, IncomingLetter::query()->count());
+        $this->assertDatabaseHas('incoming_letters', [
+            'id' => $letter->id,
+            'sender' => 'Dinas Pendidikan Provinsi',
+        ]);
+
+        // Administrator diperbolehkan.
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/surat-masuk', $this->payload(['agenda_number' => 'SM/2026/003']))
+            ->assertRedirect(route('surat-masuk.index'));
+
+        $this->assertSame(2, IncomingLetter::query()->count());
+    }
+
+    public function test_read_only_users_see_the_table_without_write_actions(): void
+    {
+        IncomingLetter::create($this->payload());
+
+        $this->actingAs($this->reader())
+            ->get('/surat-masuk')
+            ->assertOk()
+            ->assertSee('SM/2026/001')
+            ->assertSee('Anda hanya dapat melihat dan mencetak surat masuk.')
+            ->assertDontSee('data-letter-open="create"', escape: false)
+            ->assertDontSee('data-letter-edit', escape: false)
+            ->assertDontSee('data-confirm-delete', escape: false)
+            ->assertDontSee('data-letter-modal', escape: false)
+            // Cetak tetap tersedia.
+            ->assertSee('/cetak', escape: false);
+    }
+
+    public function test_read_only_users_can_open_the_print_sheet(): void
+    {
+        $letter = IncomingLetter::create($this->payload());
+
+        $this->actingAs($this->reader())
+            ->get("/surat-masuk/{$letter->id}/cetak")
+            ->assertOk()
+            ->assertSee('LEMBAR DISPOSISI');
     }
 
     public function test_search_matches_agenda_number_sender_and_subject(): void
