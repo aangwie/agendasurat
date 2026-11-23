@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\OutgoingLetter;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,13 +40,23 @@ class OutgoingLetterRequest extends FormRequest
         $month = $isUpdate ? (int) $letter->month : (int) $this->input('month');
         $code = $isUpdate ? (string) $letter->code : trim((string) $this->input('code'));
         $subCode = $isUpdate ? (string) $letter->sub_code : trim((string) $this->input('sub_code'));
-        $bidang = $isUpdate ? $letter->bidang : $user?->name;
 
-        // Kode bidang mengikuti akun pembuat. Surat lama memakai kode yang tersimpan,
-        // dan bila kosong memakai kode bidang akun yang sedang mengedit.
-        $kodeBidang = $isUpdate
-            ? ($letter->kode_bidang ?: $user?->kode_bidang)
-            : $user?->kode_bidang;
+        if ($isUpdate) {
+            // Surat lama memakai bidang dan kode yang tersimpan; bila kode kosong
+            // dipakai kode bidang akun yang sedang mengedit.
+            $bidang = $letter->bidang;
+            $kodeBidang = $letter->kode_bidang ?: $user?->kode_bidang;
+        } elseif ($user?->isAdmin()) {
+            // Administrator memilih bidang pemilik surat dari akun bidang terkait,
+            // sehingga bidang dan kode bidang diambil dari akun tersebut.
+            $bidangUser = $this->resolveBidangUser();
+            $bidang = $bidangUser?->name;
+            $kodeBidang = $bidangUser?->kode_bidang;
+        } else {
+            // Pengguna biasa selalu memakai bidang akunnya sendiri.
+            $bidang = $user?->name;
+            $kodeBidang = $user?->kode_bidang;
+        }
 
         $prefix = trim((string) $this->input('letter_prefix'));
 
@@ -67,6 +78,25 @@ class OutgoingLetterRequest extends FormRequest
             ),
             'subject' => trim((string) $this->input('subject')),
         ]);
+    }
+
+    /**
+     * Akun bidang yang dipilih administrator sebagai pemilik surat.
+     * Hanya akun yang sudah memiliki kode bidang yang dapat dipakai.
+     */
+    private function resolveBidangUser(): ?User
+    {
+        $bidangUserId = $this->input('bidang_user_id');
+
+        if (! filled($bidangUserId)) {
+            return null;
+        }
+
+        return User::query()
+            ->whereKey($bidangUserId)
+            ->whereNotNull('kode_bidang')
+            ->where('kode_bidang', '<>', '')
+            ->first();
     }
 
     /**
@@ -96,7 +126,7 @@ class OutgoingLetterRequest extends FormRequest
             return $rules;
         }
 
-        return $rules + [
+        $rules += [
             'year' => ['required', 'integer', 'between:'.OutgoingLetter::MIN_YEAR.','.OutgoingLetter::MAX_YEAR],
             'month' => ['required', 'integer', 'between:1,12'],
             'code' => [
@@ -115,6 +145,20 @@ class OutgoingLetterRequest extends FormRequest
                     ->where('code', (string) $this->input('code')),
             ],
         ];
+
+        // Administrator wajib memilih bidang pemilik surat; kode bidang mengikuti
+        // akun bidang tersebut sehingga akun tanpa kode bidang tidak dapat dipilih.
+        if ($this->user()?->isAdmin()) {
+            $rules['bidang_user_id'] = [
+                'required',
+                'integer',
+                Rule::exists('users', 'id')->where(
+                    fn ($query) => $query->whereNotNull('kode_bidang')->where('kode_bidang', '<>', ''),
+                ),
+            ];
+        }
+
+        return $rules;
     }
 
     /**
@@ -124,6 +168,8 @@ class OutgoingLetterRequest extends FormRequest
      */
     public function messages(): array
     {
+        $isAdmin = (bool) $this->user()?->isAdmin();
+
         return [
             'letter_prefix.required' => 'Kode depan nomor surat wajib diisi.',
             'letter_prefix.max' => 'Kode depan maksimal 50 karakter.',
@@ -147,9 +193,16 @@ class OutgoingLetterRequest extends FormRequest
             'sub_code.size' => 'Subkode harus terdiri dari 2 digit.',
             'sub_code.in' => 'Subkode harus antara 01 sampai 99.',
             'sub_code.unique' => 'Kode dan subkode tersebut sudah dipakai pada tahun ini.',
-            'bidang.required' => 'Bidang wajib tersedia pada akun Anda.',
+            'bidang.required' => $isAdmin
+                ? 'Bidang pemilik surat wajib dipilih.'
+                : 'Bidang wajib tersedia pada akun Anda.',
             'bidang.max' => 'Bidang maksimal 150 karakter.',
-            'kode_bidang.required' => 'Akun Anda belum memiliki kode bidang. Hubungi administrator untuk melengkapinya.',
+            'bidang_user_id.required' => 'Bidang pemilik surat wajib dipilih.',
+            'bidang_user_id.integer' => 'Bidang yang dipilih tidak valid.',
+            'bidang_user_id.exists' => 'Bidang yang dipilih tidak ditemukan atau belum memiliki kode bidang.',
+            'kode_bidang.required' => $isAdmin
+                ? 'Pilih bidang pemilik surat yang sudah memiliki kode bidang.'
+                : 'Akun Anda belum memiliki kode bidang. Hubungi administrator untuk melengkapinya.',
             'kode_bidang.max' => 'Kode bidang maksimal 30 karakter.',
         ];
     }
@@ -172,6 +225,7 @@ class OutgoingLetterRequest extends FormRequest
             'code' => 'kode',
             'sub_code' => 'subkode',
             'bidang' => 'bidang',
+            'bidang_user_id' => 'bidang pemilik surat',
         ];
     }
 

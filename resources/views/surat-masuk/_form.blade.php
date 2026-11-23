@@ -130,7 +130,9 @@
                             :value="now()->format('Y-m-d')" maxlength="10" />
 
                         <x-input-field name="agenda_number" label="Nomor Agenda" icon="document-text"
-                            :value="$suggestedAgendaNumber" placeholder="SM/{{ now()->year }}/XXX" maxlength="50" />
+                            type="number" inputmode="numeric" min="1" step="1"
+                            :value="$suggestedAgendaNumber" placeholder="1600"
+                            hint="Berupa digit angka. Disarankan otomatis dari nomor agenda terbesar saat ini + 1." />
                     </div>
                 </div>
 

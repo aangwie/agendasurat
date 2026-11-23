@@ -21,7 +21,7 @@ class IncomingLetterSeeder extends Seeder
         // Non-destruktif: hanya menambah data contoh yang belum ada.
         // Data surat yang sudah tersimpan tidak pernah dihapus/ditimpa.
         foreach (range(1, 28) as $i) {
-            $agendaNumber = 'SM/'.now()->year.'/'.str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+            $agendaNumber = (string) $i;
 
             if (IncomingLetter::query()->where('agenda_number', $agendaNumber)->exists()) {
                 continue;

@@ -21,7 +21,7 @@ class IncomingLetterTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
-            'agenda_number' => 'SM/2026/001',
+            'agenda_number' => '1600',
             'received_date' => now()->subDay()->format('Y-m-d'),
             'letter_date' => now()->subDays(3)->format('Y-m-d'),
             'letter_number' => '005/123/DISKOMINFO/2026',
@@ -76,7 +76,7 @@ class IncomingLetterTest extends TestCase
             ->assertSee('Nomor Surat')
             ->assertSee('Asal Surat')
             ->assertSee('Perihal')
-            ->assertSee('SM/2026/001')
+            ->assertSee('1600')
             ->assertSee('data-table-search', escape: false)
             ->assertSee('data-table-per-page', escape: false)
             ->assertSee('10 data')
@@ -94,7 +94,7 @@ class IncomingLetterTest extends TestCase
             ->assertSessionHas('status');
 
         $this->assertDatabaseHas('incoming_letters', [
-            'agenda_number' => 'SM/2026/001',
+            'agenda_number' => '1600',
             'letter_number' => '005/123/DISKOMINFO/2026',
             'sender' => 'Dinas Pendidikan Provinsi',
         ]);
@@ -223,7 +223,7 @@ class IncomingLetterTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('incoming_letters', [
-            'agenda_number' => 'SM/2026/001',
+            'agenda_number' => '1600',
             'letter_date' => $futureDate.' 00:00:00',
         ]);
     }
@@ -267,6 +267,41 @@ class IncomingLetterTest extends TestCase
             ->post('/surat-masuk', $this->payload(['letter_number' => '999/999/XXX/2026']))
             ->assertSessionHasErrors('agenda_number');
     }
+    public function test_the_agenda_number_must_be_digits(): void
+    {
+        foreach (['SM/2026/001', '16OO', '1600A', '0', '-5', '16 00'] as $invalid) {
+            $this->actingAs($this->manager())
+                ->post('/surat-masuk', $this->payload(['agenda_number' => $invalid]))
+                ->assertSessionHasErrors('agenda_number');
+        }
+
+        $this->assertSame(0, IncomingLetter::query()->count());
+    }
+
+    public function test_the_agenda_number_is_stored_without_leading_zeros(): void
+    {
+        $this->actingAs($this->manager())
+            ->post('/surat-masuk', $this->payload(['agenda_number' => '001600']))
+            ->assertRedirect(route('surat-masuk.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('incoming_letters', ['agenda_number' => '1600']);
+    }
+
+    public function test_the_agenda_number_field_is_a_numeric_input_with_the_suggestion(): void
+    {
+        IncomingLetter::create($this->payload(['agenda_number' => '1600']));
+
+        $this->actingAs($this->manager())
+            ->get('/surat-masuk')
+            ->assertOk()
+            ->assertSee('name="agenda_number"', escape: false)
+            ->assertSee('type="number"', escape: false)
+            ->assertSee('placeholder="1600"', escape: false)
+            ->assertSee('value="1601"', escape: false);
+    }
+
+
 
     public function test_the_received_date_cannot_be_in_the_future(): void
     {
@@ -314,7 +349,7 @@ class IncomingLetterTest extends TestCase
         $reader = $this->reader();
 
         $this->actingAs($reader)
-            ->post('/surat-masuk', $this->payload(['agenda_number' => 'SM/2026/002']))
+            ->post('/surat-masuk', $this->payload(['agenda_number' => '1601']))
             ->assertForbidden();
 
         $this->actingAs($reader)
@@ -333,7 +368,7 @@ class IncomingLetterTest extends TestCase
 
         // Administrator diperbolehkan.
         $this->actingAs(User::factory()->admin()->create())
-            ->post('/surat-masuk', $this->payload(['agenda_number' => 'SM/2026/003']))
+            ->post('/surat-masuk', $this->payload(['agenda_number' => '1602']))
             ->assertRedirect(route('surat-masuk.index'));
 
         $this->assertSame(2, IncomingLetter::query()->count());
@@ -346,7 +381,7 @@ class IncomingLetterTest extends TestCase
         $this->actingAs($this->reader())
             ->get('/surat-masuk')
             ->assertOk()
-            ->assertSee('SM/2026/001')
+            ->assertSee('1600')
             ->assertSee('Anda hanya dapat melihat dan mencetak surat masuk.')
             ->assertDontSee('data-letter-open="create"', escape: false)
             ->assertDontSee('data-letter-edit', escape: false)
@@ -370,15 +405,15 @@ class IncomingLetterTest extends TestCase
     {
         IncomingLetter::create($this->payload());
         IncomingLetter::create($this->payload([
-            'agenda_number' => 'SM/2026/002',
+            'agenda_number' => '1601',
             'sender' => 'Kecamatan Sukamaju',
             'subject' => 'Laporan Bulanan Arsip',
         ]));
 
         $user = User::factory()->create();
 
-        $this->actingAs($user)->get('/surat-masuk?q=SM/2026/002')
-            ->assertOk()->assertSee('SM/2026/002')->assertDontSee('SM/2026/001');
+        $this->actingAs($user)->get('/surat-masuk?q=1601')
+            ->assertOk()->assertSee('1601')->assertDontSee('1600');
 
         $this->actingAs($user)->get('/surat-masuk?q=sukamaju')
             ->assertOk()->assertSee('Kecamatan Sukamaju')->assertDontSee('Dinas Pendidikan Provinsi');
@@ -391,7 +426,7 @@ class IncomingLetterTest extends TestCase
     {
         foreach (range(1, 12) as $i) {
             IncomingLetter::create($this->payload([
-                'agenda_number' => 'SM/2026/'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                'agenda_number' => (string) $i,
                 'received_date' => now()->subDays($i)->format('Y-m-d'),
             ]));
         }
@@ -422,7 +457,7 @@ class IncomingLetterTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('/surat-masuk', ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
-            ->assertSee('SM/2026/001')
+            ->assertSee('1600')
             ->assertDontSee('<html', escape: false)
             ->assertDontSee('Tambah Surat Masuk');
     }
@@ -454,7 +489,7 @@ class IncomingLetterTest extends TestCase
             ->assertSee('Jl. Wastukancana No. 2, Bandung')
             ->assertSee('diskominfo.bandung.go.id')
             ->assertSee('diskominfo@bandung.go.id')
-            ->assertSee('SM/2026/001')
+            ->assertSee('1600')
             ->assertSee('Undangan Rapat Koordinasi Tata Usaha');
     }
 
@@ -673,14 +708,44 @@ class IncomingLetterTest extends TestCase
         ]);
     }
 
-    public function test_the_agenda_number_suggestion_increments(): void
+    public function test_the_agenda_number_suggestion_is_the_highest_number_plus_one(): void
     {
-        $year = now()->year;
+        $this->assertSame('1', IncomingLetter::suggestAgendaNumber());
 
-        $this->assertSame("SM/{$year}/001", IncomingLetter::suggestAgendaNumber());
+        IncomingLetter::create($this->payload(['agenda_number' => '1600']));
+        $this->assertSame('1601', IncomingLetter::suggestAgendaNumber());
 
-        IncomingLetter::create($this->payload(['agenda_number' => "SM/{$year}/007"]));
+        // Nilai terbesar yang menentukan, bukan data yang terakhir dibuat.
+        IncomingLetter::create($this->payload(['agenda_number' => '999']));
+        $this->assertSame('1601', IncomingLetter::suggestAgendaNumber());
 
-        $this->assertSame("SM/{$year}/008", IncomingLetter::suggestAgendaNumber());
+        IncomingLetter::create($this->payload(['agenda_number' => '1700']));
+        $this->assertSame('1701', IncomingLetter::suggestAgendaNumber());
+    }
+
+    public function test_the_agenda_number_suggestion_ignores_legacy_non_numeric_values(): void
+    {
+        IncomingLetter::create($this->payload(['agenda_number' => 'SM/KEEP/001']));
+
+        $this->assertSame('1', IncomingLetter::suggestAgendaNumber());
+    }
+
+    public function test_the_next_agenda_card_shows_the_highest_number_plus_one(): void
+    {
+        IncomingLetter::create($this->payload(['agenda_number' => '1599']));
+        IncomingLetter::create($this->payload(['agenda_number' => '1600']));
+
+        $content = $this->actingAs($this->manager())
+            ->get('/surat-masuk')
+            ->assertOk()
+            ->assertSee('Nomor Agenda Berikutnya')
+            ->assertSee('nomor terbesar saat ini + 1')
+            ->getContent();
+
+        // Periksa nilai di dalam kartu, bukan nilai pada formulir.
+        $cardStart = strpos($content, 'Nomor Agenda Berikutnya');
+        $this->assertNotFalse($cardStart);
+
+        $this->assertStringContainsString('1601', substr($content, $cardStart, 600));
     }
 }

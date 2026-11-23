@@ -18,7 +18,7 @@ class IncomingLetterFactory extends Factory
     public function definition(): array
     {
         return [
-            'agenda_number' => 'SM/'.now()->year.'/'.str_pad((string) fake()->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
+            'agenda_number' => (string) fake()->unique()->numberBetween(1, 9999),
             'received_date' => fake()->dateTimeBetween('-2 months', 'now')->format('Y-m-d'),
             'letter_date' => fake()->dateTimeBetween('-2 months', 'now')->format('Y-m-d'),
             'letter_number' => fake()->bothify('###/####/DISKOMINFO/'.now()->year),

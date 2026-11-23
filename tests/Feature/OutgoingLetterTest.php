@@ -182,6 +182,83 @@ class OutgoingLetterTest extends TestCase
         $this->assertSame(0, OutgoingLetter::query()->count());
     }
 
+    public function test_an_administrator_can_choose_the_bidang_of_the_letter(): void
+    {
+        $admin = User::factory()->admin()->create(['name' => 'Administrator']);
+        $bidang = $this->bidangUser(['name' => 'Bidang SMP', 'kode_bidang' => '408.37.04']);
+
+        $this->actingAs($admin)
+            ->post('/surat-keluar', $this->payload(['bidang_user_id' => $bidang->id]))
+            ->assertRedirect(route('surat-keluar.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('outgoing_letters', [
+            'user_id' => $admin->id,
+            'kode_bidang' => '408.37.04',
+            'letter_number' => '421.2/0001/408.37.04/2026',
+            'bidang' => 'Bidang SMP',
+        ]);
+    }
+
+    public function test_an_administrator_must_choose_a_bidang_when_creating_a_letter(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->bidangUser();
+
+        $this->actingAs($admin)
+            ->post('/surat-keluar', $this->payload())
+            ->assertSessionHasErrors('bidang_user_id');
+
+        $this->assertSame(0, OutgoingLetter::query()->count());
+    }
+
+    public function test_an_administrator_cannot_choose_a_bidang_without_kode_bidang(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $withoutCode = User::factory()->create(['name' => 'Bidang Tanpa Kode', 'kode_bidang' => null]);
+
+        $this->actingAs($admin)
+            ->post('/surat-keluar', $this->payload(['bidang_user_id' => $withoutCode->id]))
+            ->assertSessionHasErrors('bidang_user_id');
+
+        $this->assertSame(0, OutgoingLetter::query()->count());
+    }
+
+    public function test_the_bidang_picker_is_only_available_to_administrators(): void
+    {
+        $bidang = $this->bidangUser(['name' => 'Bidang PTK', 'kode_bidang' => '408.37.06']);
+
+        $this->actingAs($bidang)
+            ->get('/surat-keluar')
+            ->assertOk()
+            ->assertDontSee('data-outgoing-bidang-select', escape: false);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/surat-keluar')
+            ->assertOk()
+            ->assertSee('data-outgoing-bidang-select', escape: false)
+            ->assertSee('name="bidang_user_id"', escape: false)
+            ->assertSee('data-kode-bidang="408.37.06"', escape: false)
+            ->assertSee('Bidang PTK');
+    }
+
+    public function test_a_non_administrator_cannot_choose_another_bidang(): void
+    {
+        $user = $this->bidangUser(['name' => 'Bidang PTK', 'kode_bidang' => '408.37.06']);
+        $other = $this->bidangUser(['name' => 'Bidang SMP', 'kode_bidang' => '408.37.04']);
+
+        $this->actingAs($user)
+            ->post('/surat-keluar', $this->payload(['bidang_user_id' => $other->id]))
+            ->assertRedirect(route('surat-keluar.index'));
+
+        $this->assertDatabaseHas('outgoing_letters', [
+            'bidang' => 'Bidang PTK',
+            'kode_bidang' => '408.37.06',
+            'letter_number' => '421.2/0001/408.37.06/2026',
+        ]);
+    }
+
+
     public function test_the_subject_and_letter_date_are_required(): void
     {
         $user = $this->bidangUser();

@@ -32,6 +32,9 @@ export function initOutgoingLetters() {
     const letterDate = form?.querySelector('[name="letter_date"]');
     const bidangLabel = modal.querySelector('[data-outgoing-bidang]');
     const kodeBidangLabel = modal.querySelector('[data-outgoing-kode-bidang]');
+    const bidangSelect = form?.querySelector('[data-outgoing-bidang-select]');
+    const bidangPicker = modal.querySelector('[data-outgoing-bidang-picker]');
+    const bidangReadonly = modal.querySelector('[data-outgoing-bidang-readonly]');
     const numberPreview = modal.querySelector('[data-outgoing-number-preview]');
 
     const storeAction = form?.dataset.storeAction;
@@ -71,6 +74,30 @@ export function initOutgoingLetters() {
         if (kodeBidangLabel) {
             kodeBidangLabel.textContent = currentKodeBidang || '—';
         }
+    };
+
+    /**
+     * Administrator memilih bidang pemilik surat; nama dan kode bidang mengikuti
+     * akun bidang yang dipilih.
+     */
+    const syncBidangSelection = () => {
+        if (!bidangSelect) {
+            return;
+        }
+
+        const option = bidangSelect.selectedOptions[0];
+
+        if (!option) {
+            setKodeBidang('');
+
+            return;
+        }
+
+        if (bidangLabel) {
+            bidangLabel.textContent = (option.dataset.bidangName ?? option.textContent).trim();
+        }
+
+        setKodeBidang(option.dataset.kodeBidang ?? '');
     };
 
     /**
@@ -222,6 +249,15 @@ export function initOutgoingLetters() {
             field.disabled = isEdit;
         });
 
+        // Bidang hanya dapat dipilih saat menambah surat; saat edit bidang tetap.
+        bidangPicker?.classList.toggle('hidden', isEdit);
+        bidangReadonly?.classList.toggle('hidden', Boolean(bidangSelect) && !isEdit);
+
+        if (bidangSelect) {
+            bidangSelect.disabled = isEdit;
+            bidangSelect.dispatchEvent(new Event('searchable:refresh'));
+        }
+
         if (title) {
             title.textContent = isEdit ? 'Edit Surat Keluar' : 'Tambah Surat Keluar';
         }
@@ -271,13 +307,19 @@ export function initOutgoingLetters() {
             codeSelect.value = '';
             subCodeSelect.value = '';
             monthSelect.dispatchEvent(new Event('searchable:refresh'));
+            bidangSelect?.dispatchEvent(new Event('searchable:refresh'));
         }
 
-        if (bidangLabel) {
-            bidangLabel.textContent = defaultBidang;
+        if (bidangSelect) {
+            syncBidangSelection();
+        } else {
+            if (bidangLabel) {
+                bidangLabel.textContent = defaultBidang;
+            }
+
+            setKodeBidang(defaultKodeBidang);
         }
 
-        setKodeBidang(defaultKodeBidang);
         syncOptions({ resetSubCode: reset });
         refreshDateDisplays();
         open();
@@ -352,6 +394,10 @@ export function initOutgoingLetters() {
     monthSelect.addEventListener('change', () => syncOptions({ resetSubCode: true }));
     codeSelect.addEventListener('change', () => {
         syncSubCodeOptions();
+        syncNumberPreview();
+    });
+    bidangSelect?.addEventListener('change', () => {
+        syncBidangSelection();
         syncNumberPreview();
     });
     prefixInput?.addEventListener('input', syncNumberPreview);

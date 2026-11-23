@@ -18,6 +18,12 @@
         false,
     );
 
+    // Administrator memilih bidang pemilik surat dari akun bidang yang memiliki
+    // kode bidang; pengguna biasa memakai bidang akunnya sendiri.
+    $bidangOptions = $bidangOptions ?? collect();
+    $canChooseBidang = auth()->user()->isAdmin() && $bidangOptions->isNotEmpty();
+    $selectedBidangUserId = (string) old('bidang_user_id', $bidangOptions->first()->id ?? '');
+
     $openLetterPayload = $openLetter
         ? [
             'id' => $openLetter->id,
@@ -257,26 +263,68 @@
                         <p class="form-label">
                             <x-icon name="building-office" class="size-4 text-zinc-400" />
                             Bidang
+                            @if ($canChooseBidang)
+                                <span class="text-rose-500" aria-hidden="true">*</span>
+                            @endif
                         </p>
 
-                        <div
-                            class="flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                        {{-- Administrator memilih bidang pemilik surat dari akun bidang. --}}
+                        @if ($canChooseBidang)
+                            <div data-outgoing-bidang-picker>
+                                <select id="bidang_user_id" name="bidang_user_id" required data-outgoing-bidang-select
+                                    data-searchable aria-label="Bidang pemilik surat" data-placeholder="Pilih bidang"
+                                    data-search-placeholder="Cari bidang..."
+                                    @error('bidang_user_id') aria-invalid="true" aria-describedby="bidang_user_id-error" @enderror
+                                    @class(['form-input', 'form-input-error' => $errors->has('bidang_user_id')])>
+                                    @foreach ($bidangOptions as $option)
+                                        <option value="{{ $option->id }}" data-bidang-name="{{ $option->name }}"
+                                            data-kode-bidang="{{ $option->kode_bidang }}"
+                                            @selected($selectedBidangUserId === (string) $option->id)>
+                                            {{ $option->name }} — {{ $option->kode_bidang }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                <x-form-error field="bidang_user_id" />
+                            </div>
+                        @endif
+
+                        <div data-outgoing-bidang-readonly
+                            @class([
+                                'flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700',
+                                'hidden' => $canChooseBidang,
+                            ])>
                             <x-icon name="lock" class="size-4 shrink-0 text-zinc-400" />
                             <span data-outgoing-bidang class="min-w-0 font-medium">{{ auth()->user()->name }}</span>
                             <span data-outgoing-kode-bidang
                                 class="ml-auto shrink-0 rounded-md bg-zinc-900 px-2 py-0.5 font-mono text-[11px] font-semibold text-white">{{ auth()->user()->kode_bidang ?: '—' }}</span>
                         </div>
 
-                        <p class="mt-1.5 text-xs text-zinc-400">
-                            Nama dan kode bidang otomatis diambil dari akun yang membuat surat.
-                        </p>
-
-                        @if (! auth()->user()->kode_bidang)
-                            <p role="alert"
-                                class="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                                <x-icon name="x-mark" class="mt-px size-3.5 shrink-0" />
-                                Akun Anda belum memiliki kode bidang. Hubungi administrator agar nomor surat dapat disusun.
+                        @if ($canChooseBidang)
+                            <p class="mt-1.5 text-xs text-zinc-400">
+                                Bidang dan kode bidang mengikuti akun bidang yang dipilih. Saat edit, bidang tidak dapat diubah.
                             </p>
+                        @else
+                            <p class="mt-1.5 text-xs text-zinc-400">
+                                Nama dan kode bidang otomatis diambil dari akun yang membuat surat.
+                            </p>
+
+                            @if (auth()->user()->isAdmin())
+                                @if ($bidangOptions->isEmpty())
+                                    <p role="alert"
+                                        class="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                                        <x-icon name="x-mark" class="mt-px size-3.5 shrink-0" />
+                                        Belum ada akun bidang yang memiliki kode bidang. Lengkapi kode bidang pada menu
+                                        Pengguna agar bidang surat dapat dipilih.
+                                    </p>
+                                @endif
+                            @elseif (! auth()->user()->kode_bidang)
+                                <p role="alert"
+                                    class="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                                    <x-icon name="x-mark" class="mt-px size-3.5 shrink-0" />
+                                    Akun Anda belum memiliki kode bidang. Hubungi administrator agar nomor surat dapat disusun.
+                                </p>
+                            @endif
                         @endif
                     </div>
                 </div>

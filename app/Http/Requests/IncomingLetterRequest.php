@@ -26,8 +26,16 @@ class IncomingLetterRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $agendaNumber = trim((string) $this->input('agenda_number'));
+
+        // Nomor agenda berupa digit angka; nol di depan dirapikan agar nilai
+        // tersimpan konsisten (mis. "001600" menjadi "1600").
+        if ($agendaNumber !== '' && ctype_digit($agendaNumber)) {
+            $agendaNumber = (string) (int) $agendaNumber;
+        }
+
         $this->merge([
-            'agenda_number' => trim((string) $this->input('agenda_number')),
+            'agenda_number' => $agendaNumber,
             'letter_number' => trim((string) $this->input('letter_number')),
             'sender' => trim((string) $this->input('sender')),
             'subject' => trim((string) $this->input('subject')),
@@ -53,7 +61,8 @@ class IncomingLetterRequest extends FormRequest
             'agenda_number' => [
                 'required',
                 'string',
-                'max:50',
+                // Hanya digit angka tanpa nol di depan, mis. "1600".
+                'regex:/^[1-9][0-9]{0,9}$/',
                 Rule::unique('incoming_letters', 'agenda_number')->ignore($letter?->id),
             ],
             'received_date' => ['required', 'date', 'before_or_equal:today'],
@@ -76,7 +85,7 @@ class IncomingLetterRequest extends FormRequest
         return [
             'agenda_number.required' => 'Nomor agenda wajib diisi.',
             'agenda_number.unique' => 'Nomor agenda tersebut sudah dipakai surat lain.',
-            'agenda_number.max' => 'Nomor agenda maksimal 50 karakter.',
+            'agenda_number.regex' => 'Nomor agenda harus berupa angka bulat positif, tanpa huruf, spasi, atau tanda baca (maksimal 10 digit).',
             'received_date.required' => 'Tanggal diterima wajib diisi.',
             'received_date.date' => 'Tanggal diterima tidak valid.',
             'received_date.before_or_equal' => 'Tanggal diterima tidak boleh melebihi hari ini.',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\OutgoingLetterRequest;
 use App\Models\OutgoingLetter;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,16 @@ class OutgoingLetterController extends Controller
             ->groupBy('year')
             ->map(fn ($rows) => $rows->map(fn (OutgoingLetter $row) => $row->code.'-'.$row->sub_code)->values());
 
+        // Administrator memilih bidang pemilik surat dari akun bidang yang sudah
+        // memiliki kode bidang. Pengguna biasa memakai bidang akunnya sendiri.
+        $bidangOptions = $user->isAdmin()
+            ? User::query()
+                ->whereNotNull('kode_bidang')
+                ->where('kode_bidang', '<>', '')
+                ->orderBy('name')
+                ->get(['id', 'name', 'kode_bidang'])
+            : collect();
+
         $data = [
             'letters' => $letters,
             'search' => $search,
@@ -72,6 +83,7 @@ class OutgoingLetterController extends Controller
             'yearLetters' => OutgoingLetter::query()->where('year', now()->year)->count(),
             'myBidangLetters' => OutgoingLetter::query()->where('bidang', $user->name)->count(),
             'usedByYear' => $usedByYear,
+            'bidangOptions' => $bidangOptions,
             'months' => OutgoingLetter::MONTHS,
             'allCodes' => OutgoingLetter::allCodes(),
             'allSubCodes' => OutgoingLetter::allSubCodes(),

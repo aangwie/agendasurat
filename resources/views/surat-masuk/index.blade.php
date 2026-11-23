@@ -37,10 +37,10 @@
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">Nomor Agenda Berikutnya</p>
-                        <p class="mt-1.5 font-mono text-2xl font-extrabold tracking-tight text-rose-600">
+                        <p class="mt-1.5 font-mono text-3xl font-extrabold tracking-tight text-rose-600">
                             {{ $suggestedAgendaNumber }}
                         </p>
-                        <p class="mt-1 text-xs text-zinc-400">disarankan otomatis</p>
+                        <p class="mt-1 text-xs text-zinc-400">nomor terbesar saat ini + 1</p>
                     </div>
                     <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-900 text-white">
                         <x-icon name="document-text" class="size-5" />

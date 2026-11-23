@@ -6,6 +6,7 @@ use Database\Factories\IncomingLetterFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class IncomingLetter extends Model
 {
@@ -95,20 +96,22 @@ class IncomingLetter extends Model
     }
 
     /**
-     * Build the next agenda number suggestion, e.g. "SM/2026/007".
+     * Nomor agenda terbesar yang saat ini tercatat (0 bila belum ada).
+     *
+     * Nomor agenda disimpan sebagai string digit. Penambahan `+ 0` membuat
+     * perbandingan berjalan numerik pada MySQL maupun SQLite, dan data lama
+     * berformat lain (mis. "SM/2026/001") otomatis dihitung 0 sehingga diabaikan.
+     */
+    public static function maxAgendaNumber(): int
+    {
+        return (int) static::query()->max(DB::raw('agenda_number + 0'));
+    }
+
+    /**
+     * Nomor agenda berikutnya: nomor terbesar saat ini + 1, mis. 1699 => 1700.
      */
     public static function suggestAgendaNumber(): string
     {
-        $year = now()->year;
-        $prefix = 'SM/'.$year.'/';
-
-        $last = static::query()
-            ->where('agenda_number', 'like', $prefix.'%')
-            ->orderByDesc('agenda_number')
-            ->value('agenda_number');
-
-        $sequence = $last ? (int) substr($last, strlen($prefix)) + 1 : 1;
-
-        return $prefix.str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+        return (string) (static::maxAgendaNumber() + 1);
     }
 }

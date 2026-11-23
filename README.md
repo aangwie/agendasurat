@@ -20,7 +20,7 @@ Aplikasi tata usaha digital untuk mencatat surat masuk, surat keluar, dan agenda
 - **Dashboard**: 4 kartu ringkasan (Surat Masuk, Surat Keluar, Surat Tugas, Total Surat) dan grafik 3 bar —
   Surat Masuk (merah `#e11d48`), Surat Keluar (biru laut `#1e3a8a`), Surat Tugas (kuning tua `#ca8a04`).
   Nilai Surat Masuk memakai data nyata; Surat Keluar & Surat Tugas masih 0 sampai modulnya tersedia.
-- **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
+- **Surat Masuk**: input tanggal surat, nomor surat, asal surat, perihal, sifat surat (checkbox Segera/Penting, Terbuka, Rahasia), tanggal diterima, dan nomor agenda (digit angka dengan saran otomatis nomor terbesar + 1); datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **cetak**, **edit**, dan **hapus** (konfirmasi memakai SweetAlert2).
 - **Surat Keluar**: penomoran berjenjang **Tahun → Bulan → Kode → Subkode** (kombinasi unik per tahun) dengan input **Nomor Surat Keluar**, **Perihal**, dan **Tanggal Surat**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon edit & hapus (konfirmasi SweetAlert2) hanya untuk pembuat surat dan administrator.
 - **Agenda**: input **Tanggal, Tempat, Penanggung Jawab, Peserta**; datatable dengan pencarian, slice data 10/25/50/100, dan pagination; aksi ikon **edit** & **hapus** (konfirmasi SweetAlert2).
 - **Pengguna (CRUD)**: kelola akun per bidang — nama bidang, kode bidang (format register, mis. `408.37.06`), email, no HP (opsional), password + konfirmasi password; datatable dengan pencarian (termasuk kode bidang), slice data 10/25/50/100, pagination, serta aksi ikon edit & hapus (konfirmasi SweetAlert2). Akun yang sedang dipakai tidak dapat dihapus.
@@ -206,7 +206,10 @@ urutan field: **Tanggal Surat**, **Nomor Surat**, **Asal Surat**, **Perihal**,
 - **Sifat Surat** berupa checkbox: *Segera/Penting*, *Terbuka*, dan *Rahasia*
   (boleh lebih dari satu, boleh dikosongkan). Nilai disimpan sebagai JSON dan
   ditampilkan sebagai badge pada tabel serta label pada lembar cetak.
-- Nomor agenda disarankan otomatis dengan format `SM/{tahun}/{urut}` dan divalidasi unik.
+- Nomor agenda berupa **digit angka** (mis. `1600`) dan divalidasi unik. Kolom saran
+  pada kartu ringkasan dan formulir otomatis berisi **nomor agenda terbesar saat ini + 1**
+  (mis. data terbesar `1699` → saran `1700`). Data lama berformat lain (mis. `SM/2026/001`)
+  diabaikan saat menghitung nomor terbesar.
 - **Hak akses**: hanya **Subbagian Umum dan Kepegawaian** (kode bidang `408.37.01`)
   dan **administrator** yang dapat menambah, mengubah, dan menghapus surat masuk.
   Akun bidang lain bersifat **hanya-baca**: tetap bisa melihat tabel, mencari,
@@ -271,11 +274,14 @@ pratinjau nomor lengkap secara langsung saat kode depan/tahun/bulan/kode/subkode
   titik, serta tanda hubung — garis miring tidak dipakai agar nomor tetap 4 bagian.
 - **Kode bidang** otomatis diambil dari kode bidang akun pembuat (`users.kode_bidang`).
   Akun tanpa kode bidang akan ditolak dengan pesan agar administrator melengkapinya.
+  Khusus **administrator**, bidang pemilik surat dipilih dari daftar akun bidang
+  (akun yang sudah memiliki kode bidang), lalu kode bidang diambil dari akun tersebut.
 - **Perihal** wajib diisi (maks. 255 karakter) dan **Tanggal Surat** wajib diisi.
   Tanggal surat **boleh melebihi hari ini** karena surat dapat diterbitkan di kemudian
   hari. Tanggal ditampilkan dalam format Indonesia, contoh **12 Agustus 2026**
   (tabel dan pratinjau formulir).
-- **Bidang** otomatis diambil dari akun pembuat surat, bukan input bebas.
+- **Bidang** diambil dari akun pembuat surat, bukan input bebas. Administrator memilih
+  bidang pemilik surat dari daftar akun bidang pada formulir tambah surat.
 - Saat mengedit, nomor urut (tahun/kode/subkode) dan kode bidang tetap; hanya kode
   depan, perihal, dan tanggal surat yang dapat diubah. Nomor lengkap disusun ulang
   otomatis dari komponen tersebut.
