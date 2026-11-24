@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TaskLetterController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WhatsappGatewayController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +44,16 @@ Route::middleware('auth')->group(function () {
         Route::post('pengguna', [UserController::class, 'store'])->name('pengguna.store');
         Route::put('pengguna/{pengguna}', [UserController::class, 'update'])->name('pengguna.update');
         Route::delete('pengguna/{pengguna}', [UserController::class, 'destroy'])->name('pengguna.destroy');
+
+        // Whatsapp Gateway (Baileys) — koneksi QR, simpan sesi, dan uji pesan.
+        Route::get('whatsapp-gateway', [WhatsappGatewayController::class, 'index'])->name('whatsapp.index');
+        Route::put('whatsapp-gateway', [WhatsappGatewayController::class, 'update'])->name('whatsapp.update');
+        Route::get('whatsapp-gateway/qr', [WhatsappGatewayController::class, 'qr'])->name('whatsapp.qr');
+        Route::get('whatsapp-gateway/status', [WhatsappGatewayController::class, 'status'])->name('whatsapp.status');
+        Route::post('whatsapp-gateway/sesi', [WhatsappGatewayController::class, 'saveSession'])->name('whatsapp.session.save');
+        Route::post('whatsapp-gateway/disconnect', [WhatsappGatewayController::class, 'disconnect'])->name('whatsapp.disconnect');
+        Route::get('whatsapp-gateway/uji-pesan', [WhatsappGatewayController::class, 'test'])->name('whatsapp.test');
+        Route::post('whatsapp-gateway/uji-pesan', [WhatsappGatewayController::class, 'sendTest'])->name('whatsapp.test.send');
 
         Route::get('pengaturan', [SettingsController::class, 'index'])->name('pengaturan.index');
         Route::put('pengaturan', [SettingsController::class, 'update'])->name('pengaturan.update');

@@ -28,6 +28,7 @@
             'items' => [
                 ['title' => 'Profil Instansi', 'icon' => 'building-office', 'route' => 'profil-instansi.edit'],
                 ['title' => 'Pengguna', 'icon' => 'users', 'route' => 'pengguna.index'],
+                ['title' => 'Whatsapp Gateway', 'icon' => 'whatsapp', 'route' => 'whatsapp.index'],
                 ['title' => 'Pengaturan', 'icon' => 'cog', 'route' => 'pengaturan.index'],
             ],
         ],

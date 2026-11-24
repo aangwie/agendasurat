@@ -214,6 +214,23 @@
                 d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
             @break
 
+        @case('whatsapp')
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 21l1.65-3.8a9 9 0 113.4 2.9L3 21" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M9 10a.5.5 0 001 0V9a.5.5 0 00-1 0v1a5 5 0 005 5h1a.5.5 0 000-1h-1a.5.5 0 000 1" />
+            @break
+
+        @case('qr-code')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 14h2v2h-2zM18 14h2M14 18v2M18 18h2v2h-2z" />
+            @break
+
+        @case('arrow-path')
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            @break
+
         @default
             <path stroke-linecap="round" stroke-linejoin="round"
                 d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\OutgoingLetterRequest;
 use App\Models\OutgoingLetter;
 use App\Models\User;
+use App\Services\WhatsappNotifier;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ class OutgoingLetterController extends Controller
     private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
     private const DEFAULT_PER_PAGE = 10;
+
+    public function __construct(private readonly WhatsappNotifier $notifier) {}
 
     /**
      * Tampilkan datatable surat keluar.
@@ -123,7 +126,19 @@ class OutgoingLetterController extends Controller
 
         return redirect()
             ->route('surat-keluar.index')
-            ->with('status', "Surat keluar {$letter->fullCode()} berhasil ditambahkan.");
+            ->with('status', $this->statusMessage($letter, $this->notifier->notifyOutgoingLetter($letter)));
+    }
+
+    /**
+     * Gabungkan pesan sukses dengan ringkasan notifikasi WhatsApp.
+     *
+     * @param  array{message: string}  $notice
+     */
+    private function statusMessage(OutgoingLetter $letter, array $notice): string
+    {
+        $message = "Surat keluar {$letter->fullCode()} berhasil ditambahkan.";
+
+        return trim($message.' '.($notice['message'] ?? ''));
     }
 
     /**

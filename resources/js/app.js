@@ -11,6 +11,7 @@ import { initAgendas } from './agenda';
 import { initOutgoingLetters } from './surat-keluar';
 import { initTaskLetters } from './surat-tugas';
 import { initSearchableSelects } from './searchable-select';
+import { initWhatsappGateway, initWhatsappTest } from './whatsapp';
 
 // Dipakai juga oleh modul lain (mis. penanganan sesi berakhir di csrf.js).
 window.Swal = Swal;
@@ -322,6 +323,8 @@ onReady(() => {
     initOutgoingLetters();
     initTaskLetters();
     initDateDisplays();
+    initWhatsappGateway();
+    initWhatsappTest();
 
     /**
      * Konfirmasi hapus memakai SweetAlert2.

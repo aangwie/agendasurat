@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Services\WhatsappNotifier;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -59,7 +61,25 @@ class UserRequest extends FormRequest
                 'max:150',
                 Rule::unique('users', 'email')->ignore($user?->id),
             ],
-            'phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[0-9]{7,13}$/'],
+            'phone' => [
+                'nullable',
+                'string',
+                'regex:/^(\+62|62|0)8[0-9]{7,13}$/',
+                // Nomor administrator tidak boleh sama dengan nomor WhatsApp gateway,
+                // karena notifikasi akan dikirim ke perangkat itu sendiri.
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (blank($value) || ! $this->boolean('is_admin')) {
+                        return;
+                    }
+
+                    $notifier = app(WhatsappNotifier::class);
+                    $gatewayPhone = $notifier->gatewayPhone();
+
+                    if ($gatewayPhone !== null && $notifier->normalizePhone((string) $value) === $gatewayPhone) {
+                        $fail('Nomor HP administrator tidak boleh sama dengan nomor WhatsApp gateway (+'.$gatewayPhone.').');
+                    }
+                },
+            ],
             'password' => $isUpdate
                 ? ['nullable', 'string', Password::min(8), 'confirmed']
                 : ['required', 'string', Password::min(8), 'confirmed'],

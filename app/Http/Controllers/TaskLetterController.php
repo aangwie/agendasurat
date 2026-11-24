@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\TaskLetterRequest;
 use App\Models\TaskLetter;
 use App\Models\User;
+use App\Services\WhatsappNotifier;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ class TaskLetterController extends Controller
     private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
     private const DEFAULT_PER_PAGE = 10;
+
+    public function __construct(private readonly WhatsappNotifier $notifier) {}
 
     /**
      * Tampilkan datatable surat tugas.
@@ -123,7 +126,19 @@ class TaskLetterController extends Controller
 
         return redirect()
             ->route('surat-tugas.index')
-            ->with('status', "Surat tugas {$letter->fullCode()} berhasil ditambahkan.");
+            ->with('status', $this->statusMessage($letter, $this->notifier->notifyTaskLetter($letter)));
+    }
+
+    /**
+     * Gabungkan pesan sukses dengan ringkasan notifikasi WhatsApp.
+     *
+     * @param  array{message: string}  $notice
+     */
+    private function statusMessage(TaskLetter $letter, array $notice): string
+    {
+        $message = "Surat tugas {$letter->fullCode()} berhasil ditambahkan.";
+
+        return trim($message.' '.($notice['message'] ?? ''));
     }
 
     /**
