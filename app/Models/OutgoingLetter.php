@@ -21,9 +21,11 @@ class OutgoingLetter extends Model
     public const MAX_YEAR = 2099;
 
     /**
-     * Tiga kode arsip untuk setiap bulan, dimulai dari 00 pada Januari.
+     * Lima kode arsip untuk setiap bulan, dimulai dari 00 pada Januari.
+     *
+     * Januari 00-04, Februari 05-09, ... Desember 55-59.
      */
-    public const CODES_PER_MONTH = 3;
+    public const CODES_PER_MONTH = 5;
 
     /**
      * Jumlah subkode untuk setiap kode.
@@ -116,7 +118,7 @@ class OutgoingLetter extends Model
     }
 
     /**
-     * Seluruh kode arsip 00-35.
+     * Seluruh kode arsip 00-59.
      *
      * @return list<string>
      */

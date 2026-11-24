@@ -9,7 +9,7 @@ return new class extends Migration
     /**
      * Run the migrations.
      *
-     * Tabel surat keluar. Setiap tahun memiliki kode bulanan (00-35) dan
+     * Tabel surat keluar. Setiap tahun memiliki kode bulanan (00-59) dan
      * subkode 01-99. Kombinasi tahun + kode + subkode tidak boleh dipakai dua kali.
      * Non-destruktif: hanya membuat tabel baru.
      */

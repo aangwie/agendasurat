@@ -97,7 +97,7 @@ class OutgoingLetterTest extends TestCase
             ->post('/surat-keluar', $this->payload([
                 'year' => 2026,
                 'month' => 2,
-                'code' => '03',
+                'code' => '05',
                 'sub_code' => '56',
                 'letter_prefix' => '400.3.5',
             ]))
@@ -107,10 +107,10 @@ class OutgoingLetterTest extends TestCase
         $this->assertDatabaseHas('outgoing_letters', [
             'user_id' => $user->id,
             'letter_prefix' => '400.3.5',
-            'code' => '03',
+            'code' => '05',
             'sub_code' => '56',
             'kode_bidang' => '408.37.06',
-            'letter_number' => '400.3.5/0356/408.37.06/2026',
+            'letter_number' => '400.3.5/0556/408.37.06/2026',
         ]);
     }
 
@@ -351,10 +351,27 @@ class OutgoingLetterTest extends TestCase
         $user = $this->bidangUser();
 
         $this->actingAs($user)
-            ->post('/surat-keluar', $this->payload(['month' => 1, 'code' => '03']))
+            ->post('/surat-keluar', $this->payload(['month' => 1, 'code' => '05']))
             ->assertSessionHasErrors('code');
 
         $this->assertSame(0, OutgoingLetter::query()->count());
+    }
+
+    public function test_each_month_has_five_archive_codes(): void
+    {
+        $this->assertSame(['00', '01', '02', '03', '04'], OutgoingLetter::codesForMonth(1));
+        $this->assertSame(['05', '06', '07', '08', '09'], OutgoingLetter::codesForMonth(2));
+        $this->assertSame(['55', '56', '57', '58', '59'], OutgoingLetter::codesForMonth(12));
+
+        $this->assertCount(60, OutgoingLetter::allCodes());
+        $this->assertSame('00', OutgoingLetter::allCodes()[0]);
+        $this->assertSame('59', OutgoingLetter::allCodes()[59]);
+
+        $this->assertSame(1, OutgoingLetter::monthForCode('00'));
+        $this->assertSame(1, OutgoingLetter::monthForCode('04'));
+        $this->assertSame(2, OutgoingLetter::monthForCode('05'));
+        $this->assertSame(2, OutgoingLetter::monthForCode('09'));
+        $this->assertSame(12, OutgoingLetter::monthForCode('59'));
     }
 
     public function test_the_creator_can_update_the_letter_prefix(): void
@@ -507,11 +524,11 @@ class OutgoingLetterTest extends TestCase
             'user_id' => $second->id,
             'year' => 2026,
             'month' => 2,
-            'code' => '03',
+            'code' => '05',
             'sub_code' => '01',
             'letter_prefix' => '400.3.5',
             'kode_bidang' => '408.37.04',
-            'letter_number' => '400.3.5/0301/408.37.04/2026',
+            'letter_number' => '400.3.5/0501/408.37.04/2026',
             'subject' => 'Laporan Kegiatan Sekolah',
             'bidang' => 'Bidang SD',
         ]);
@@ -519,16 +536,16 @@ class OutgoingLetterTest extends TestCase
         $this->actingAs($first)->get('/surat-keluar?q=PTK')
             ->assertOk()
             ->assertSee('421.2/0001/408.37.06/2026')
-            ->assertDontSee('400.3.5/0301/408.37.04/2026');
+            ->assertDontSee('400.3.5/0501/408.37.04/2026');
 
         $this->actingAs($first)->get('/surat-keluar?q=400.3.5')
             ->assertOk()
-            ->assertSee('400.3.5/0301/408.37.04/2026')
+            ->assertSee('400.3.5/0501/408.37.04/2026')
             ->assertDontSee('421.2/0001/408.37.06/2026');
 
         $this->actingAs($first)->get('/surat-keluar?q=Kegiatan')
             ->assertOk()
-            ->assertSee('400.3.5/0301/408.37.04/2026')
+            ->assertSee('400.3.5/0501/408.37.04/2026')
             ->assertDontSee('421.2/0001/408.37.06/2026');
     }
 
@@ -537,11 +554,13 @@ class OutgoingLetterTest extends TestCase
         $user = $this->bidangUser();
 
         foreach (range(0, 11) as $index) {
+            $month = 1 + ($index % 6);
+
             OutgoingLetter::factory()->create([
                 'user_id' => $user->id,
                 'year' => 2026 + intdiv($index, 6),
-                'month' => 1 + ($index % 6),
-                'code' => str_pad((string) (($index % 6) * 3), 2, '0', STR_PAD_LEFT),
+                'month' => $month,
+                'code' => OutgoingLetter::codesForMonth($month)[0],
                 'sub_code' => str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
             ]);
         }

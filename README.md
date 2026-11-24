@@ -252,7 +252,7 @@ php artisan db:seed --class=IncomingLetterSeeder
 ## Surat keluar
 
 Halaman **Surat Keluar** (`/surat-keluar`) mencatat surat yang diterbitkan instansi.
-Nomor urut dipilih berjenjang: **Tahun → Bulan → Kode (00–35) → Subkode (01–99)**,
+Nomor urut dipilih berjenjang: **Tahun → Bulan → Kode (00–59) → Subkode (01–99)**,
 lalu diisi **Nomor Surat Keluar**, **Perihal**, dan **Tanggal Surat**.
 
 Nomor surat **tidak diketik penuh**. Cukup isi **kode depan** (mis. `400.3.5`),
@@ -267,7 +267,7 @@ dan tahun `2026` menghasilkan **`400.3.5/0356/408.37.06/2026`**. Nilai inilah ya
 disimpan pada kolom `letter_number` dan ditampilkan di tabel. Formulir menampilkan
 pratinjau nomor lengkap secara langsung saat kode depan/tahun/bulan/kode/subkode diubah.
 
-- Setiap tahun memiliki 3 kode per bulan (Januari `00–02` … Desember `33–35`).
+- Setiap tahun memiliki 5 kode per bulan (Januari `00–04` … Desember `55–59`).
   Kombinasi tahun + kode + subkode tidak boleh dipakai dua kali; kode/subkode yang
   sudah terpakai otomatis dinonaktifkan pada formulir.
 - **Kode depan** wajib diisi (maks. 50 karakter) dan hanya boleh berisi huruf, angka,
