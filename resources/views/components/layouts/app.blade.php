@@ -131,7 +131,7 @@
                     Modul bertahap
                 </div>
                 <p class="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                    Surat tugas dan laporan akan aktif pada tahap pengembangan berikutnya.
+                    Modul laporan akan aktif pada tahap pengembangan berikutnya.
                 </p>
             </div>
 

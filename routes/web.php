@@ -9,6 +9,7 @@ use App\Http\Controllers\LetterClassificationController;
 use App\Http\Controllers\OutgoingLetterController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\TaskLetterController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -70,16 +71,10 @@ Route::middleware('auth')->group(function () {
     Route::put('surat-keluar/{outgoingLetter}', [OutgoingLetterController::class, 'update'])->name('surat-keluar.update');
     Route::delete('surat-keluar/{outgoingLetter}', [OutgoingLetterController::class, 'destroy'])->name('surat-keluar.destroy');
 
-    Route::view('surat-tugas', 'modules.placeholder', [
-        'title' => 'Surat Tugas',
-        'description' => 'Terbitkan dan arsipkan surat tugas pegawai lengkap dengan dasar penugasan dan periode tugas.',
-        'icon' => 'clipboard-document-list',
-        'features' => [
-            'Penerbitan surat tugas pegawai',
-            'Dasar dan uraian penugasan',
-            'Rekap penugasan per pegawai',
-        ],
-    ])->name('surat-tugas.index');
+    Route::get('surat-tugas', [TaskLetterController::class, 'index'])->name('surat-tugas.index');
+    Route::post('surat-tugas', [TaskLetterController::class, 'store'])->name('surat-tugas.store');
+    Route::put('surat-tugas/{taskLetter}', [TaskLetterController::class, 'update'])->name('surat-tugas.update');
+    Route::delete('surat-tugas/{taskLetter}', [TaskLetterController::class, 'destroy'])->name('surat-tugas.destroy');
 
     Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
     Route::post('agenda', [AgendaController::class, 'store'])->name('agenda.store');

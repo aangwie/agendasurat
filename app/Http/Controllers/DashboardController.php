@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\IncomingLetter;
+use App\Models\OutgoingLetter;
+use App\Models\TaskLetter;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
@@ -11,8 +13,9 @@ class DashboardController extends Controller
     /**
      * Show the application dashboard.
      *
-     * Catatan: angka dan daftar di bawah masih berupa data contoh (placeholder)
-     * sampai modul surat masuk, surat keluar, dan agenda tersedia.
+     * Catatan: kartu ringkasan memakai data nyata dari tabel surat, sedangkan
+     * daftar surat terbaru, agenda, dan rincian status masih berupa data contoh
+     * (placeholder) sampai modul terkait tersedia.
      */
     public function __invoke(): View
     {
@@ -30,11 +33,16 @@ class DashboardController extends Controller
             ->whereBetween('received_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
             ->count();
 
-        // Surat keluar & surat tugas belum memiliki modul/tabel, sehingga
-        // nilainya masih 0. Tampilan grafik sudah disiapkan agar nanti
-        // otomatis terisi dari data modul tersebut.
-        $outgoingTotal = 0;
-        $taskTotal = 0;
+        $outgoingTotal = OutgoingLetter::query()->count();
+        $outgoingThisMonth = OutgoingLetter::query()
+            ->whereBetween('letter_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
+            ->count();
+
+        $taskTotal = TaskLetter::query()->count();
+        $taskThisMonth = TaskLetter::query()
+            ->whereBetween('letter_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
+            ->count();
+
         $totalLetters = $incomingTotal + $outgoingTotal + $taskTotal;
 
         $stats = [
@@ -50,18 +58,18 @@ class DashboardController extends Controller
             [
                 'label' => 'Surat Keluar',
                 'value' => $outgoingTotal,
-                'delta' => 'Modul',
-                'trend' => 'neutral',
-                'hint' => 'belum tersedia',
+                'delta' => '+'.$outgoingThisMonth,
+                'trend' => 'up',
+                'hint' => 'surat bulan ini',
                 'icon' => 'paper-airplane',
                 'accent' => 'blue',
             ],
             [
                 'label' => 'Surat Tugas',
                 'value' => $taskTotal,
-                'delta' => 'Modul',
-                'trend' => 'neutral',
-                'hint' => 'belum tersedia',
+                'delta' => '+'.$taskThisMonth,
+                'trend' => 'up',
+                'hint' => 'surat bulan ini',
                 'icon' => 'clipboard-document-list',
                 'accent' => 'amber',
             ],

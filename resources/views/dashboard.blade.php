@@ -133,7 +133,7 @@
                 <div class="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-zinc-50 px-4 py-3">
                     <p class="text-xs text-zinc-500">
                         Total <span class="font-semibold text-zinc-900">{{ number_format($totalLetters, 0, ',', '.') }} surat</span>
-                        tercatat. Data Surat Keluar &amp; Surat Tugas akan terisi otomatis setelah modulnya aktif.
+                        tercatat dari surat masuk, surat keluar, dan surat tugas.
                     </p>
                     <a href="{{ route('laporan.index') }}"
                         class="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 transition hover:text-rose-700">
