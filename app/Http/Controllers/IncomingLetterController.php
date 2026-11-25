@@ -159,6 +159,7 @@ class IncomingLetterController extends Controller
             ->orderByDesc('id')
             ->get()
             ->unique('kode_bidang')
+            ->reject(fn (LetterDisposition $disposition): bool => ! $disposition->isActive())
             ->keyBy('kode_bidang');
 
         $bidangs = $this->notifier->bidangRecipients()
@@ -173,6 +174,7 @@ class IncomingLetterController extends Controller
                     'label' => $recipient['label'] ?? $recipient['name'],
                     'phone' => $recipient['phone'],
                     'can_receive' => $recipient['phone'] !== null,
+                    'disposition_id' => $last?->id,
                     'last_status' => $last?->status,
                     'last_status_label' => $last?->statusLabel(),
                     'last_sent_at' => $last?->sent_at?->locale('id')->translatedFormat('j M Y, H:i'),
@@ -199,6 +201,7 @@ class IncomingLetterController extends Controller
             ],
             'bidangs' => $bidangs,
             'send_url' => route('surat-masuk.disposisi.kirim', $incomingLetter),
+            'cancel_url' => route('surat-masuk.disposisi.batal', $incomingLetter),
         ]);
     }
 
@@ -233,8 +236,10 @@ class IncomingLetterController extends Controller
         $user = $request->user();
         $result = $this->notifier->notifyDisposition($incomingLetter, $targets, (string) $user?->name);
 
+        $stored = [];
+
         foreach ($result['results'] as $row) {
-            LetterDisposition::create([
+            $record = LetterDisposition::create([
                 'incoming_letter_id' => $incomingLetter->id,
                 'kode_bidang' => $row['kode_bidang'],
                 'bidang_name' => $row['name'],
@@ -245,6 +250,10 @@ class IncomingLetterController extends Controller
                 'disposed_by' => $user?->id,
                 'sent_at' => $row['status'] === LetterDisposition::STATUS_SENT ? now() : null,
             ]);
+
+            $row['disposition_id'] = $record->id;
+            $row['sent_at'] = $record->sent_at?->locale('id')->translatedFormat('j M Y, H:i');
+            $stored[] = $row;
         }
 
         $sent = collect($result['results'])->where('status', LetterDisposition::STATUS_SENT)->count();
@@ -257,7 +266,90 @@ class IncomingLetterController extends Controller
             'failed' => $failed,
             'skipped' => $skipped,
             'message' => $this->dispositionSummary($sent, $failed, $skipped),
-            'results' => $result['results'],
+            'results' => $stored,
+        ]);
+    }
+
+    /**
+     * Batalkan disposisi surat masuk pada satu bidang (mis. salah tujuan).
+     */
+    public function cancelDisposition(Request $request, IncomingLetter $incomingLetter): JsonResponse
+    {
+        $data = $request->validate([
+            'kode_bidang' => ['required', 'string', 'max:30'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'notify' => ['nullable', 'boolean'],
+        ], [
+            'kode_bidang.required' => 'Pilih bidang yang disposisinya akan dibatalkan.',
+            'reason.max' => 'Alasan pembatalan maksimal 255 karakter.',
+        ], [
+            'kode_bidang' => 'bidang',
+            'reason' => 'alasan pembatalan',
+        ]);
+
+        $disposition = $incomingLetter->dispositions()
+            ->where('kode_bidang', $data['kode_bidang'])
+            ->whereIn('status', LetterDisposition::ACTIVE_STATUSES)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($disposition === null) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tidak ada disposisi aktif untuk bidang tersebut.',
+            ], 422);
+        }
+
+        $user = $request->user();
+        $reason = trim((string) ($data['reason'] ?? ''));
+
+        // Pembatalan dicatat sebagai baris riwayat baru agar jejak disposisi
+        // sebelumnya tetap utuh (tidak menghapus data).
+        $cancelled = LetterDisposition::create([
+            'incoming_letter_id' => $incomingLetter->id,
+            'kode_bidang' => $disposition->kode_bidang,
+            'bidang_name' => $disposition->bidang_name,
+            'user_id' => $disposition->user_id,
+            'phone' => $disposition->phone,
+            'status' => LetterDisposition::STATUS_CANCELLED,
+            'message' => $reason !== '' ? $reason : 'Dibatalkan oleh '.$user?->name.'.',
+            'disposed_by' => $user?->id,
+            'cancelled_at' => now(),
+            'cancel_reason' => $reason !== '' ? $reason : null,
+        ]);
+
+        // Pemberitahuan WhatsApp bersifat opsional dan tidak menghalangi
+        // pembatalan bila gateway bermasalah.
+        $notification = null;
+
+        if ($request->boolean('notify')) {
+            $target = $this->notifier->bidangRecipients()
+                ->firstWhere('kode_bidang', $disposition->kode_bidang);
+
+            if (is_array($target)) {
+                $notification = $this->notifier->notifyDispositionCancelled(
+                    $incomingLetter,
+                    $target,
+                    $reason,
+                    (string) $user?->name,
+                );
+            }
+        }
+
+        $label = $disposition->bidang_name;
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Disposisi ke '.$label.' dibatalkan.'
+                .($notification !== null ? ' '.$notification['message'] : ''),
+            'notification' => $notification,
+            'cancelled' => [
+                'id' => $cancelled->id,
+                'kode_bidang' => $cancelled->kode_bidang,
+                'bidang_name' => $cancelled->bidang_name,
+                'reason' => $cancelled->cancel_reason,
+                'cancelled_at' => $cancelled->cancelled_at?->locale('id')->translatedFormat('j M Y, H:i'),
+            ],
         ]);
     }
 

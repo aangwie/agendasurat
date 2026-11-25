@@ -315,6 +315,156 @@ class IncomingLetterDispositionTest extends TestCase
         $this->assertStringContainsString('<span class="truncate">PTK</span>', $html);
     }
 
+    public function test_a_disposition_can_be_cancelled_and_disappears_from_the_table(): void
+    {
+        $manager = $this->manager();
+
+        $bidang = User::factory()->create([
+            'name' => 'Bidang Pembinaan Sekolah Menengah Pertama (SMP)',
+            'alias' => 'SMP',
+            'kode_bidang' => '408.37.04',
+            'phone' => '6284444444444',
+        ]);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        $sent = LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.04',
+            'bidang_name' => $bidang->name,
+            'user_id' => $bidang->id,
+            'phone' => '6284444444444',
+            'status' => LetterDisposition::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        // Sebelum dibatalkan: badge tampil di tabel.
+        $before = $this->actingAs($manager)->get('/surat-masuk')->assertOk()->getContent();
+        $this->assertStringContainsString('data-disposition-bidang="408.37.04"', $before);
+
+        Http::fake();
+
+        $this->actingAs($manager)
+            ->deleteJson(route('surat-masuk.disposisi.batal', $letter), [
+                'kode_bidang' => '408.37.04',
+                'reason' => 'Salah bidang, seharusnya PTK',
+                'notify' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('cancelled.kode_bidang', '408.37.04');
+
+        // Riwayat lama tetap ada, pembatalan dicatat sebagai baris baru.
+        $this->assertDatabaseHas('letter_dispositions', [
+            'id' => $sent->id,
+            'status' => LetterDisposition::STATUS_SENT,
+        ]);
+
+        $this->assertDatabaseHas('letter_dispositions', [
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.04',
+            'status' => LetterDisposition::STATUS_CANCELLED,
+            'cancel_reason' => 'Salah bidang, seharusnya PTK',
+        ]);
+
+        // Tanpa pemberitahuan WA karena notify=false.
+        Http::assertNothingSent();
+
+        // Badge tujuan disposisi hilang dari tabel.
+        $after = $this->actingAs($manager)->get('/surat-masuk')->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-disposition-bidang="408.37.04"', $after);
+
+        // Popup tidak lagi menawarkan pembatalan untuk bidang tersebut.
+        $popup = $this->actingAs($manager)
+            ->getJson(route('surat-masuk.disposisi', $letter))
+            ->assertOk()
+            ->json('bidangs');
+
+        $row = collect($popup)->firstWhere('kode_bidang', '408.37.04');
+
+        $this->assertNull($row['last_status']);
+        $this->assertNull($row['disposition_id']);
+    }
+
+    public function test_cancelling_sends_a_whatsapp_notice_when_requested(): void
+    {
+        $manager = $this->manager();
+
+        $bidang = User::factory()->create([
+            'name' => 'Bidang Pembinaan Sekolah Menengah Pertama (SMP)',
+            'alias' => 'SMP',
+            'kode_bidang' => '408.37.04',
+            'phone' => '0812-5555-6666',
+        ]);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.04',
+            'bidang_name' => $bidang->name,
+            'user_id' => $bidang->id,
+            'phone' => '6281255556666',
+            'status' => LetterDisposition::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        Http::fake([
+            'gateway.billnesia.com/health' => Http::response(['status' => 'online']),
+            'gateway.billnesia.com/send' => Http::response(['success' => true, 'messageId' => 'CANCEL-1']),
+        ]);
+
+        $this->actingAs($manager)
+            ->deleteJson(route('surat-masuk.disposisi.batal', $letter), [
+                'kode_bidang' => '408.37.04',
+                'reason' => 'Salah bidang, seharusnya PTK',
+                'notify' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('notification.ok', true);
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'http://gateway.billnesia.com/send') {
+                return false;
+            }
+
+            $message = (string) ($request['pesan'] ?? '');
+
+            return $request['nomor_penerima'] === '6281255556666'
+                && str_contains($message, 'Pembatalan Disposisi Surat Masuk')
+                && str_contains($message, 'Salah bidang, seharusnya PTK')
+                && str_contains($message, 'tidak ditindaklanjuti');
+        });
+    }
+
+    public function test_cancelling_requires_an_active_disposition(): void
+    {
+        $letter = IncomingLetter::create($this->payload());
+
+        $this->actingAs($this->manager())
+            ->deleteJson(route('surat-masuk.disposisi.batal', $letter), [
+                'kode_bidang' => '408.37.06',
+                'notify' => false,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false);
+    }
+
+    public function test_only_the_letter_manager_can_cancel_a_disposition(): void
+    {
+        $letter = IncomingLetter::create($this->payload());
+
+        $reader = User::factory()->create(['is_admin' => false, 'kode_bidang' => '408.37.03']);
+
+        $this->actingAs($reader)
+            ->deleteJson(route('surat-masuk.disposisi.batal', $letter), [
+                'kode_bidang' => '408.37.04',
+                'notify' => false,
+            ])
+            ->assertForbidden();
+    }
+
     public function test_the_letter_page_shows_the_disposition_action_and_modal(): void
     {
         IncomingLetter::create($this->payload());
@@ -326,6 +476,9 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertSee('data-disposisi-modal', escape: false)
             ->assertSee('data-disposisi-form', escape: false)
             ->assertSee('data-letter-attachment', escape: false)
+            ->assertSee('data-disposisi-cancel-section', escape: false)
+            ->assertSee('data-disposisi-cancel-list', escape: false)
+            ->assertSee('Batalkan Disposisi yang Salah')
             ->assertSee('Kirim Disposisi');
     }
 }

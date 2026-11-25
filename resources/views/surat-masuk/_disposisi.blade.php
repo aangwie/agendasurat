@@ -123,6 +123,39 @@
                         </p>
                     </div>
 
+                    {{-- Batalkan disposisi yang salah tujuan --}}
+                    <div data-disposisi-cancel-section
+                        class="hidden rounded-xl border border-rose-200 bg-rose-50/50 px-3.5 py-3">
+                        <div class="flex items-start gap-2.5">
+                            <span
+                                class="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-rose-600 ring-1 ring-rose-200">
+                                <x-icon name="x-mark" class="size-4" />
+                            </span>
+
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-rose-800">Batalkan Disposisi yang Salah</p>
+                                <p class="mt-0.5 text-[11px] leading-relaxed text-rose-700/80">
+                                    Salah kirim bidang? Batalkan disposisi di bawah, lalu disposisikan ulang ke
+                                    bidang yang benar.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div data-disposisi-cancel-list class="mt-2.5 space-y-1.5"></div>
+
+                        <div class="mt-2.5 space-y-2">
+                            <input type="text" data-disposisi-cancel-reason maxlength="255"
+                                placeholder="Alasan pembatalan (opsional), mis. salah bidang tujuan"
+                                class="form-input py-2 text-xs">
+
+                            <label class="flex cursor-pointer items-start gap-2 text-[11px] leading-relaxed text-rose-800">
+                                <input type="checkbox" data-disposisi-cancel-notify checked
+                                    class="mt-0.5 size-3.5 shrink-0 rounded border-rose-300 accent-rose-600">
+                                <span>Kirim pemberitahuan pembatalan via WhatsApp ke bidang tersebut.</span>
+                            </label>
+                        </div>
+                    </div>
+
                     {{-- Hasil pengiriman --}}
                     <div data-disposisi-result class="hidden rounded-xl border px-4 py-3" role="status"
                         aria-live="polite">

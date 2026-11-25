@@ -212,6 +212,78 @@ class WhatsappNotifier
     }
 
     /**
+     * Kirim pemberitahuan pembatalan disposisi ke satu bidang.
+     *
+     * Dipakai saat disposisi salah kirim (mis. seharusnya PTK tetapi terkirim
+     * ke SMP). Kegagalan pengiriman tidak membatalkan proses pembatalan.
+     *
+     * @param  array{kode_bidang: string, name: string, user: User, phone: ?string}  $target
+     * @return array{ok: bool, message: string}
+     */
+    public function notifyDispositionCancelled(IncomingLetter $letter, array $target, string $reason, string $senderName): array
+    {
+        $phone = $target['phone'];
+
+        if ($phone === null) {
+            return ['ok' => false, 'message' => 'Bidang tidak memiliki nomor WhatsApp.'];
+        }
+
+        if ($phone === $this->gatewayPhone()) {
+            return ['ok' => false, 'message' => 'Nomor bidang sama dengan nomor gateway.'];
+        }
+
+        $timeout = max(3, (int) config('whatsapp-gateway.notify_timeout', 5));
+
+        $health = $this->gateway->health($timeout);
+
+        if (! $health['ok']) {
+            return ['ok' => false, 'message' => 'Gateway WhatsApp tidak dapat dihubungi.'];
+        }
+
+        try {
+            $result = $this->gateway->send(
+                $phone,
+                $this->dispositionCancelMessage($letter, $reason, $senderName),
+                $timeout,
+            );
+        } catch (Throwable $exception) {
+            return ['ok' => false, 'message' => $exception->getMessage()];
+        }
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => 'Pemberitahuan pembatalan terkirim.']
+            : ['ok' => false, 'message' => (string) ($result['message'] ?? 'Gagal dikirim.')];
+    }
+
+    /**
+     * Susun isi pesan pembatalan disposisi.
+     */
+    public function dispositionCancelMessage(IncomingLetter $letter, string $reason, string $senderName): string
+    {
+        $lines = [
+            '*Pembatalan Disposisi Surat Masuk*',
+            '',
+            '*Nomor Agenda:* '.$letter->agenda_number,
+            '*Nomor Surat:* '.$letter->letter_number,
+            '*Asal Surat:* '.$letter->sender,
+            '*Perihal:* '.$letter->subject,
+            '',
+            'Disposisi surat ini kepada bidang Anda *dibatalkan* karena kekeliruan tujuan.',
+        ];
+
+        if (trim($reason) !== '') {
+            $lines[] = '*Alasan:* '.trim($reason);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Mohon surat ini tidak ditindaklanjuti.';
+        $lines[] = 'Dibatalkan oleh '.$senderName.'.';
+        $lines[] = (string) config('app.name', 'Agenda Surat');
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * Susun isi pesan disposisi surat masuk beserta tautan unduhan.
      */
     public function dispositionMessage(IncomingLetter $letter, string $senderName): string

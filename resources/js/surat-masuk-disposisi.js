@@ -9,13 +9,18 @@ const STATUS_STYLES = {
     sent: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
     failed: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
     skipped: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+    cancelled: 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200',
 };
 
 const STATUS_LABELS = {
     sent: 'Terkirim',
     failed: 'Gagal',
     skipped: 'Dilewati',
+    cancelled: 'Dibatalkan',
 };
+
+const CANCEL_ICON =
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="size-3.5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>';
 
 const SHARE_ICON =
     '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="size-3 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>';
@@ -48,6 +53,10 @@ export function initIncomingLetterDisposition() {
     const attachmentName = modal.querySelector('[data-disposisi-attachment-name]');
     const attachmentMeta = modal.querySelector('[data-disposisi-attachment-meta]');
     const subtitle = modal.querySelector('[data-disposisi-subtitle]');
+    const cancelSection = modal.querySelector('[data-disposisi-cancel-section]');
+    const cancelList = modal.querySelector('[data-disposisi-cancel-list]');
+    const cancelReason = modal.querySelector('[data-disposisi-cancel-reason]');
+    const cancelNotify = modal.querySelector('[data-disposisi-cancel-notify]');
 
     if (!panel || !form || !list) {
         return;
@@ -62,6 +71,7 @@ export function initIncomingLetterDisposition() {
     };
 
     let sendUrl = '';
+    let cancelUrl = '';
     let lastFocused = null;
     let activeButton = null;
     let bidangs = [];
@@ -206,6 +216,75 @@ export function initIncomingLetterDisposition() {
         container.classList.toggle('hidden', rows.length === 0);
     };
 
+    /**
+     * Konfirmasi sebelum membatalkan disposisi (SweetAlert2 bila tersedia).
+     */
+    const askConfirmation = (title, text) => {
+        if (window.Swal) {
+            return window.Swal.fire({
+                icon: 'warning',
+                title,
+                text,
+                showCancelButton: true,
+                confirmButtonText: 'Ya, batalkan',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#52525b',
+                reverseButtons: true,
+                focusCancel: true,
+            }).then((result) => result.isConfirmed === true);
+        }
+
+        return Promise.resolve(window.confirm(`${title}\n\n${text}`));
+    };
+
+    /**
+     * Tampilkan daftar disposisi aktif yang masih bisa dibatalkan.
+     */
+    const renderCancelList = () => {
+        if (!cancelSection || !cancelList) {
+            return;
+        }
+
+        const rows = bidangs.filter((bidang) => bidang.last_status && bidang.disposition_id);
+
+        cancelSection.classList.toggle('hidden', rows.length === 0);
+
+        if (rows.length === 0) {
+            cancelList.innerHTML = '';
+
+            return;
+        }
+
+        cancelList.innerHTML = rows
+            .map((bidang) => {
+                const primary = bidang.alias || bidang.name;
+                const statusLabel = bidang.last_status_label ?? STATUS_LABELS[bidang.last_status] ?? '';
+                const sentAt = bidang.last_sent_at ? ` &middot; ${escapeHtml(bidang.last_sent_at)}` : '';
+
+                return `<div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-white px-2.5 py-2">
+                    <span class="min-w-0">
+                        <span class="block truncate text-xs font-semibold text-zinc-800"
+                            title="${escapeHtml(bidang.name)}">${escapeHtml(primary)}</span>
+                        <span class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+                            <span class="badge ${STATUS_STYLES[bidang.last_status] ?? 'bg-zinc-100 text-zinc-600'}">
+                                ${escapeHtml(statusLabel)}
+                            </span>
+                            <span class="font-mono">${escapeHtml(bidang.kode_bidang)}</span>
+                            ${sentAt}
+                        </span>
+                    </span>
+
+                    <button type="button" data-disposisi-batal="${escapeHtml(bidang.kode_bidang)}"
+                        class="btn shrink-0 border border-rose-200 bg-white px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-50">
+                        ${CANCEL_ICON}
+                        Batalkan
+                    </button>
+                </div>`;
+            })
+            .join('');
+    };
+
     const renderLetter = (data) => {
         setText(fields.agenda, data.letter?.agenda_number);
         setText(fields.number, data.letter?.letter_number);
@@ -258,7 +337,17 @@ export function initIncomingLetterDisposition() {
     const load = async (url) => {
         bidangs = [];
         sendUrl = '';
+        cancelUrl = '';
         hideResult();
+
+        if (cancelReason) {
+            cancelReason.value = '';
+        }
+
+        if (cancelNotify) {
+            cancelNotify.checked = true;
+        }
+
         list.innerHTML =
             '<p class="rounded-xl bg-zinc-50 px-3 py-2.5 text-xs text-zinc-500">Memuat daftar bidang...</p>';
         open();
@@ -278,9 +367,11 @@ export function initIncomingLetterDisposition() {
 
             bidangs = Array.isArray(data.bidangs) ? data.bidangs : [];
             sendUrl = data.send_url ?? '';
+            cancelUrl = data.cancel_url ?? '';
 
             renderLetter(data);
             renderBidangs();
+            renderCancelList();
         } catch (error) {
             list.innerHTML = `<p class="rounded-xl bg-rose-50 px-3 py-2.5 text-xs text-rose-600">${escapeHtml(
                 error.message,
@@ -310,6 +401,92 @@ export function initIncomingLetterDisposition() {
         if (event.target.matches('input[name="bidangs[]"]')) {
             updateCount();
         }
+    });
+
+    /**
+     * Batalkan disposisi pada satu bidang lalu segarkan tampilan.
+     */
+    const cancelDisposition = async (kodeBidang) => {
+        const bidang = bidangs.find((row) => row.kode_bidang === kodeBidang);
+
+        if (!bidang || !cancelUrl) {
+            return;
+        }
+
+        const label = bidang.alias || bidang.name;
+        const reason = (cancelReason?.value ?? '').trim();
+        const notify = cancelNotify ? cancelNotify.checked : true;
+
+        const confirmed = await askConfirmation(
+            'Batalkan disposisi?',
+            `Disposisi ke ${label} akan dibatalkan.` +
+                (notify ? ' Bidang tersebut akan menerima pemberitahuan WhatsApp.' : ''),
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(cancelUrl, {
+                method: 'DELETE',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ kode_bidang: kodeBidang, reason, notify }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const validation = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+
+                throw new Error(validation ?? payload.message ?? 'Disposisi gagal dibatalkan.');
+            }
+
+            // Disposisi batal tidak lagi dihitung sebagai tujuan aktif.
+            bidangs = bidangs.map((row) =>
+                row.kode_bidang === kodeBidang
+                    ? {
+                          ...row,
+                          disposition_id: null,
+                          last_status: null,
+                          last_status_label: null,
+                          last_sent_at: null,
+                      }
+                    : row,
+            );
+
+            if (cancelReason) {
+                cancelReason.value = '';
+            }
+
+            renderBidangs();
+            renderCancelList();
+            renderTableBadges();
+
+            setResult('success', payload.message ?? 'Disposisi dibatalkan.', [
+                { name: label, status: 'cancelled', label: 'Dibatalkan' },
+            ]);
+        } catch (error) {
+            setResult('error', 'Disposisi gagal dibatalkan', [
+                { name: error.message, status: 'failed', label: 'Gagal' },
+            ]);
+        }
+    };
+
+    cancelList?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-disposisi-batal]');
+
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        cancelDisposition(button.dataset.disposisiBatal);
     });
 
     modal.querySelector('[data-disposisi-select-all]')?.addEventListener('click', () => {
@@ -416,24 +593,22 @@ export function initIncomingLetterDisposition() {
             );
 
             // Perbarui status terakhir pada ceklist.
-            const byCode = new Map(results.map((row) => [row.kode_bidang, row.status]));
+            const byCode = new Map(results.map((row) => [row.kode_bidang, row]));
 
             bidangs = bidangs.map((bidang) =>
                 byCode.has(bidang.kode_bidang)
                     ? {
                           ...bidang,
-                          last_status: byCode.get(bidang.kode_bidang),
-                          last_status_label:
-                              byCode.get(bidang.kode_bidang) === 'sent'
-                                  ? 'Terkirim'
-                                  : byCode.get(bidang.kode_bidang) === 'skipped'
-                                    ? 'Dilewati'
-                                    : 'Gagal',
+                          disposition_id: byCode.get(bidang.kode_bidang).disposition_id ?? null,
+                          last_status: byCode.get(bidang.kode_bidang).status,
+                          last_status_label: STATUS_LABELS[byCode.get(bidang.kode_bidang).status] ?? null,
+                          last_sent_at: byCode.get(bidang.kode_bidang).sent_at ?? null,
                       }
                     : bidang,
             );
 
             renderBidangs();
+            renderCancelList();
             renderTableBadges();
         } catch (error) {
             setResult('error', 'Disposisi gagal dikirim', [

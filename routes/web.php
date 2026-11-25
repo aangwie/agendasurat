@@ -83,6 +83,8 @@ Route::middleware('auth')->group(function () {
             ->name('surat-masuk.disposisi');
         Route::post('surat-masuk/{incomingLetter}/disposisi', [IncomingLetterController::class, 'sendDisposition'])
             ->name('surat-masuk.disposisi.kirim');
+        Route::delete('surat-masuk/{incomingLetter}/disposisi', [IncomingLetterController::class, 'cancelDisposition'])
+            ->name('surat-masuk.disposisi.batal');
     });
 
     Route::get('surat-keluar', [OutgoingLetterController::class, 'index'])->name('surat-keluar.index');

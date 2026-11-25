@@ -95,7 +95,10 @@ class IncomingLetter extends Model
     }
 
     /**
-     * Disposisi terakhir untuk setiap bidang (satu baris per bidang).
+     * Disposisi terakhir yang masih aktif untuk setiap bidang.
+     *
+     * Baris berstatus "cancelled" diabaikan sehingga badge pada tabel surat
+     * masuk ikut hilang setelah disposisi dibatalkan.
      *
      * @return Collection<int, LetterDisposition>
      */
@@ -104,6 +107,7 @@ class IncomingLetter extends Model
         return $this->dispositions
             ->sortByDesc('id')
             ->unique('kode_bidang')
+            ->reject(fn (LetterDisposition $disposition): bool => $disposition->status === LetterDisposition::STATUS_CANCELLED)
             ->sortBy('kode_bidang')
             ->values();
     }

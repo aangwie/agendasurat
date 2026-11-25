@@ -20,6 +20,18 @@ class LetterDisposition extends Model
     public const STATUS_SKIPPED = 'skipped';
 
     /**
+     * Disposisi dibatalkan (mis. salah bidang tujuan).
+     */
+    public const STATUS_CANCELLED = 'cancelled';
+
+    /**
+     * Status yang dianggap disposisi masih aktif pada surat.
+     *
+     * @var list<string>
+     */
+    public const ACTIVE_STATUSES = [self::STATUS_SENT, self::STATUS_FAILED, self::STATUS_SKIPPED];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -34,6 +46,8 @@ class LetterDisposition extends Model
         'message',
         'disposed_by',
         'sent_at',
+        'cancelled_at',
+        'cancel_reason',
     ];
 
     /**
@@ -45,6 +59,7 @@ class LetterDisposition extends Model
     {
         return [
             'sent_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -77,7 +92,16 @@ class LetterDisposition extends Model
             self::STATUS_SENT => 'Terkirim',
             self::STATUS_FAILED => 'Gagal',
             self::STATUS_SKIPPED => 'Dilewati',
+            self::STATUS_CANCELLED => 'Dibatalkan',
             default => 'Tidak diketahui',
         };
+    }
+
+    /**
+     * Apakah disposisi ini masih berlaku (belum dibatalkan).
+     */
+    public function isActive(): bool
+    {
+        return in_array($this->status, self::ACTIVE_STATUSES, true);
     }
 }

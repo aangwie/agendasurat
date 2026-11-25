@@ -256,6 +256,24 @@ disimpan pada tabel `letter_dispositions` sehingga popup dapat menampilkan
 riwayat terakhirnya. Bidang tanpa nomor atau yang nomornya sama dengan nomor
 gateway otomatis **dilewati**.
 
+#### Membatalkan disposisi yang salah
+
+Bila disposisi terkirim ke bidang yang keliru (mis. seharusnya **PTK** tetapi
+terkirim ke **SMP**), buka kembali popup disposisi surat tersebut. Bagian
+**Batalkan Disposisi yang Salah** menampilkan setiap bidang yang disposisinya
+masih aktif beserta status dan waktu kirimnya.
+
+- Tombol **Batalkan** meminta konfirmasi (SweetAlert2) lalu mencatat pembatalan
+  sebagai baris riwayat baru berstatus `cancelled` — riwayat disposisi lama
+  **tidak dihapus** dan alasan pembatalan (opsional) ikut tersimpan.
+- Badge bidang tersebut langsung hilang dari tabel surat masuk dan dari ceklist,
+  sehingga surat dapat **didisposisikan ulang** ke bidang yang benar.
+- Secara bawaan penerima juga dikirimi pesan WhatsApp
+  *“Pembatalan Disposisi Surat Masuk”* berisi alasan dan permintaan agar surat
+  tidak ditindaklanjuti. Hilangkan centang pada opsi tersebut bila tidak ingin
+  mengirim pemberitahuan. Kegagalan kirim WhatsApp tidak membatalkan proses
+  pembatalan.
+
 Tautan pada pesan memakai `APP_URL`; bila `APP_URL` masih `localhost`, isi
 `WHATSAPP_GATEWAY_PUBLIC_URL` (lihat bagian *Uji Pesan WhatsApp & Lampiran*).
 
