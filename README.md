@@ -217,8 +217,34 @@ urutan field: **Tanggal Surat**, **Nomor Surat**, **Asal Surat**, **Perihal**,
   dan permintaan tulis ditolak dengan `403`.
 - Datatable: pencarian (nomor agenda, nomor surat, asal surat, perihal), slice data
   10/25/50/100 baris, dan pagination — semuanya berjalan lewat AJAX.
-- Aksi per baris memakai ikon: **cetak** (`printer`), **edit** (`pencil`), dan
-  **hapus** (`trash`). Penghapusan dikonfirmasi dengan **SweetAlert2**.
+- Aksi per baris memakai ikon: **cetak** (`printer`), **disposisi** (`share`),
+  **edit** (`pencil`), dan **hapus** (`trash`). Penghapusan dikonfirmasi dengan
+  **SweetAlert2**.
+- **Lampiran surat** (opsional) dapat diunggah pada formulir: PDF atau gambar
+  (JPG/PNG/WEBP), maksimal 10 MB. Berkas disimpan pada disk **privat**
+  (`storage/app/private/incoming-letters`) dan hanya dapat diunduh pengguna yang
+  sudah login lewat `/surat-masuk/{id}/lampiran`.
+
+### Disposisi surat masuk
+
+Tombol **disposisi** pada kolom aksi membuka popup berisi:
+
+- ringkasan surat (nomor agenda, nomor surat, perihal, asal, tanggal) dan
+  **lampiran surat** dengan tombol **Unduh** (bila lampiran tersedia);
+- **ceklist nama bidang** — diambil dari akun pengguna yang memiliki
+  `kode_bidang` (satu bidang = satu akun, akun bernomor WhatsApp dipilih lebih
+  dulu). Bidang tanpa nomor WhatsApp ditandai dan tidak dapat dicentang;
+- status disposisi terakhir per bidang (Terkirim / Gagal / Dilewati).
+
+Saat **Kirim Disposisi** ditekan, setiap bidang yang dicentang menerima pesan
+WhatsApp berisi ringkasan surat, sifat, nama pendisposisi, dan **tautan unduhan
+surat** (lampiran bila ada, jika tidak halaman cetak). Hasil tiap bidang
+disimpan pada tabel `letter_dispositions` sehingga popup dapat menampilkan
+riwayat terakhirnya. Bidang tanpa nomor atau yang nomornya sama dengan nomor
+gateway otomatis **dilewati**.
+
+Tautan pada pesan memakai `APP_URL`; bila `APP_URL` masih `localhost`, isi
+`WHATSAPP_GATEWAY_PUBLIC_URL` (lihat bagian *Uji Pesan WhatsApp & Lampiran*).
 
 ### Lembar disposisi (cetak)
 
@@ -366,6 +392,33 @@ tidak dieksekusi (sudah diatur pada `phpunit.xml`).
 Menu **Whatsapp Gateway** (khusus administrator) menyediakan halaman **Uji Pesan**
 di `/whatsapp-gateway/uji-pesan` untuk memastikan perangkat sudah tertaut dan pesan
 terkirim dengan benar.
+
+### Sesi per lingkungan (lokal vs hosting)
+
+Gateway menyimpan **satu sesi Baileys per device ID**
+(`.baileys_auth/device_{deviceId}`). Bila aplikasi lokal dan hosting memakai device
+ID yang sama, keduanya berbagi satu sesi: **memutus koneksi di lokal ikut memutus
+hosting** (dan sebaliknya), dan pesan uji dari lokal terkirim lewat perangkat hosting.
+
+Karena itu device ID diberi akhiran lingkungan secara otomatis:
+
+| Lingkungan (`APP_ENV`) | Device ID | Catatan |
+| --- | --- | --- |
+| `production` | `agenda-surat` | hosting tetap memakai sesi yang sudah ada |
+| `local` | `agenda-surat-local` | perlu pindai QR sendiri |
+| `staging` | `agenda-surat-staging` | perlu pindai QR sendiri |
+
+- Akhiran diatur lewat `WHATSAPP_GATEWAY_DEVICE_SUFFIX`: **baris dikomentari**
+  (tidak diisi) = otomatis seperti tabel di atas; diisi nilai (mis. `local`) =
+  akhiran tersebut; diisi kosong (`SUFFIX=`) = akhiran dimatikan sehingga semua
+  lingkungan kembali berbagi satu sesi.
+- Device ID lama yang tersimpan sebagai nama dasar (mis. `agenda-surat`) pada
+  database lokal otomatis dibaca sebagai `agenda-surat-local`, sehingga sesi
+  hosting tidak tersentuh. Device ID khusus yang pernah diisi manual
+  (mis. `agenda-bidang-tik`) tetap dipakai apa adanya.
+- Halaman gateway menampilkan peringatan bila device ID ternyata dipakai bersama.
+
+### Lampiran
 
 - **Lampiran opsional** — PDF, JPG, JPEG, PNG, atau WEBP (maksimal 8 MB, dapat
   diubah lewat `WHATSAPP_GATEWAY_ATTACHMENT_MAX_KB`). Isi pesan boleh dikosongkan

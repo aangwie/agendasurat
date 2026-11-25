@@ -27,6 +27,9 @@ class WhatsappNotificationTest extends TestCase
         // Notifikasi dimatikan pada phpunit.xml; aktifkan khusus untuk test ini.
         config(['whatsapp-gateway.notify_letters' => true]);
 
+        // Device ID tetap agar tidak bergantung pada akhiran lingkungan (APP_ENV).
+        config(['whatsapp-gateway.device_suffix' => '']);
+
         AppSetting::put('whatsapp_session_device', 'agenda-surat');
         AppSetting::put('whatsapp_session_phone', self::GATEWAY_PHONE);
     }

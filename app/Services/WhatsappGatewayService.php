@@ -44,11 +44,84 @@ class WhatsappGatewayService
     }
 
     /**
-     * Device ID bawaan.
+     * Device ID dasar, tanpa akhiran lingkungan.
+     */
+    public function baseDeviceId(): string
+    {
+        return $this->sanitizeDeviceId((string) config('whatsapp-gateway.device_id', 'agenda-surat'), 'agenda-surat');
+    }
+
+    /**
+     * Akhiran device ID yang memisahkan sesi antar lingkungan.
+     *
+     * Kosong pada production agar sesi hosting yang sudah ada tetap berlaku.
+     */
+    public function deviceSuffix(): string
+    {
+        $configured = config('whatsapp-gateway.device_suffix');
+
+        // Nilai eksplisit (termasuk string kosong) dipakai apa adanya.
+        if ($configured !== null) {
+            return $this->sanitizeDeviceId((string) $configured, '');
+        }
+
+        if ($this->runsInProduction()) {
+            return '';
+        }
+
+        return $this->sanitizeDeviceId((string) config('app.env', 'production'), '');
+    }
+
+    /**
+     * Apakah aplikasi berjalan pada lingkungan produksi.
+     */
+    public function runsInProduction(): bool
+    {
+        return in_array((string) config('app.env', 'production'), ['production', 'prod'], true);
+    }
+
+    /**
+     * Device ID bawaan untuk instalasi ini (dasar + akhiran lingkungan).
      */
     public function defaultDeviceId(): string
     {
-        return (string) config('whatsapp-gateway.device_id', 'agenda-surat');
+        $suffix = $this->deviceSuffix();
+
+        return $suffix !== ''
+            ? $this->baseDeviceId().'-'.$suffix
+            : $this->baseDeviceId();
+    }
+
+    /**
+     * Device ID aktif (hanya huruf, angka, titik, garis bawah, dan strip).
+     *
+     * Nilai tersimpan yang masih memakai nama dasar dianggap belum disesuaikan,
+     * sehingga tetap diberi akhiran lingkungan. Tujuannya agar instalasi lokal
+     * tidak memakai sesi milik hosting pada gateway yang sama.
+     */
+    public function deviceId(): string
+    {
+        $stored = $this->sanitizeDeviceId((string) AppSetting::get(self::SETTING_DEVICE), '');
+
+        if ($stored === '') {
+            return $this->defaultDeviceId();
+        }
+
+        if ($stored === $this->baseDeviceId() && $this->deviceSuffix() !== '') {
+            return $this->defaultDeviceId();
+        }
+
+        return $stored;
+    }
+
+    /**
+     * Bersihkan device ID agar aman dipakai pada URL gateway.
+     */
+    private function sanitizeDeviceId(string $value, string $fallback): string
+    {
+        $device = preg_replace('/[^A-Za-z0-9._-]/', '-', trim($value)) ?? '';
+
+        return $device !== '' ? $device : $fallback;
     }
 
     /**
@@ -69,16 +142,6 @@ class WhatsappGatewayService
         $url = preg_replace('~/server\.js$~i', '', $this->configuredUrl()) ?? $this->configuredUrl();
 
         return rtrim(trim($url), '/');
-    }
-
-    /**
-     * Device ID aktif (hanya huruf, angka, titik, garis bawah, dan strip).
-     */
-    public function deviceId(): string
-    {
-        $device = preg_replace('/[^A-Za-z0-9._-]/', '-', trim((string) AppSetting::get(self::SETTING_DEVICE, $this->defaultDeviceId()))) ?? '';
-
-        return $device !== '' ? $device : $this->defaultDeviceId();
     }
 
     /**

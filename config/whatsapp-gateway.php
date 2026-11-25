@@ -30,6 +30,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Akhiran Device ID per Lingkungan
+    |--------------------------------------------------------------------------
+    |
+    | Gateway menyimpan satu sesi Baileys per device ID (folder
+    | .baileys_auth/device_{deviceId}). Bila aplikasi lokal dan hosting memakai
+    | device ID yang sama, keduanya BERBAGI satu sesi: memutus koneksi di lokal
+    | ikut memutus hosting, dan sebaliknya.
+    |
+    | Bila variabel ini tidak diisi (null), akhiran "-{APP_ENV}" otomatis
+    | dipakai untuk lingkungan selain production, sehingga:
+    |   - hosting (production)  : agenda-surat        (tidak perlu pindai ulang)
+    |   - lokal (local)         : agenda-surat-local
+    |   - pengujian (testing)   : agenda-surat-testing
+    |
+    | Isi WHATSAPP_GATEWAY_DEVICE_SUFFIX= (kosong) untuk mematikan akhiran dan
+    | kembali berbagi satu device ID, atau isi nilai lain (mis. "staging").
+    |
+    */
+
+    'device_suffix' => env('WHATSAPP_GATEWAY_DEVICE_SUFFIX'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Batas Waktu & Interval Polling
     |--------------------------------------------------------------------------
     |

@@ -110,6 +110,7 @@
 
         @if ($canManage)
             @include('surat-masuk._form')
+            @include('surat-masuk._disposisi')
         @endif
     </div>
 </x-layouts.app>

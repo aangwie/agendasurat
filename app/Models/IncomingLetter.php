@@ -6,7 +6,9 @@ use Database\Factories\IncomingLetterFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class IncomingLetter extends Model
 {
@@ -32,6 +34,11 @@ class IncomingLetter extends Model
     public const MANAGER_KODE_BIDANG = '408.37.01';
 
     /**
+     * Disk penyimpanan lampiran surat (privat, diunduh lewat controller).
+     */
+    public const ATTACHMENT_DISK = 'local';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -44,6 +51,8 @@ class IncomingLetter extends Model
         'sender',
         'subject',
         'sifat',
+        'attachment_path',
+        'attachment_name',
     ];
 
     /**
@@ -72,6 +81,44 @@ class IncomingLetter extends Model
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * Riwayat disposisi surat ini.
+     *
+     * @return HasMany<LetterDisposition, $this>
+     */
+    public function dispositions(): HasMany
+    {
+        return $this->hasMany(LetterDisposition::class);
+    }
+
+    /**
+     * Apakah surat memiliki lampiran berkas.
+     */
+    public function hasAttachment(): bool
+    {
+        return filled($this->attachment_path);
+    }
+
+    /**
+     * Nama berkas lampiran yang ditampilkan ke pengguna.
+     */
+    public function attachmentLabel(): string
+    {
+        return (string) ($this->attachment_name ?: basename((string) $this->attachment_path));
+    }
+
+    /**
+     * Hapus berkas lampiran dari disk (dipanggil sebelum menimpa/menghapus surat).
+     */
+    public function deleteAttachment(): void
+    {
+        if (! $this->hasAttachment()) {
+            return;
+        }
+
+        Storage::disk(self::ATTACHMENT_DISK)->delete((string) $this->attachment_path);
     }
 
     /**

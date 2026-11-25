@@ -5,6 +5,13 @@
 </a>
 
 @if ($canManage)
+    <button type="button" data-letter-disposisi="{{ $letter->id }}"
+        data-disposisi-url="{{ route('surat-masuk.disposisi', $letter) }}"
+        title="Disposisi surat" aria-label="Disposisi surat {{ $letter->agenda_number }}"
+        class="grid size-8 place-items-center rounded-lg text-zinc-500 transition hover:bg-emerald-600 hover:text-white">
+        <x-icon name="share" class="size-4" />
+    </button>
+
     <button type="button" data-letter-edit="{{ $letter->id }}"
         data-letter-payload="{{ json_encode([
             'id' => $letter->id,
@@ -15,6 +22,7 @@
             'sender' => $letter->sender,
             'subject' => $letter->subject,
             'sifat' => $letter->sifat ?? [],
+            'attachment_name' => $letter->attachment_name,
             'update_url' => route('surat-masuk.update', $letter),
         ]) }}"
         title="Edit surat" aria-label="Edit surat {{ $letter->agenda_number }}"

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AppSetting;
 use App\Models\User;
+use App\Services\WhatsappGatewayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
@@ -14,6 +15,97 @@ use Tests\TestCase;
 class WhatsappGatewayTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Uji memakai device ID tetap (tanpa akhiran lingkungan) agar tidak
+        // bergantung pada APP_ENV. Perilaku akhiran diuji secara khusus.
+        config(['whatsapp-gateway.device_suffix' => '']);
+    }
+
+    public function test_the_device_id_is_scoped_to_the_environment_to_avoid_shared_sessions(): void
+    {
+        // Tanpa konfigurasi eksplisit, akhiran mengikuti APP_ENV (bukan production).
+        config(['whatsapp-gateway.device_suffix' => null, 'app.env' => 'local']);
+
+        $gateway = app(WhatsappGatewayService::class);
+
+        $this->assertSame('agenda-surat', $gateway->baseDeviceId());
+        $this->assertSame('local', $gateway->deviceSuffix());
+        $this->assertSame('agenda-surat-local', $gateway->deviceId());
+    }
+
+    public function test_production_keeps_the_plain_device_id(): void
+    {
+        config(['whatsapp-gateway.device_suffix' => null, 'app.env' => 'production']);
+
+        $gateway = app(WhatsappGatewayService::class);
+
+        $this->assertSame('', $gateway->deviceSuffix());
+        $this->assertSame('agenda-surat', $gateway->deviceId());
+    }
+
+    public function test_a_stored_base_device_id_is_still_scoped(): void
+    {
+        // Nilai lama yang sudah tersimpan di database (mis. "agenda-surat").
+        AppSetting::put('whatsapp_gateway_device', 'agenda-surat');
+
+        config(['whatsapp-gateway.device_suffix' => 'local']);
+
+        $this->assertSame('agenda-surat-local', app(WhatsappGatewayService::class)->deviceId());
+    }
+
+    public function test_an_explicitly_customised_device_id_is_kept(): void
+    {
+        AppSetting::put('whatsapp_gateway_device', 'agenda-bidang-tik');
+
+        config(['whatsapp-gateway.device_suffix' => 'local']);
+
+        $this->assertSame('agenda-bidang-tik', app(WhatsappGatewayService::class)->deviceId());
+    }
+
+    public function test_disconnecting_only_targets_the_device_of_this_installation(): void
+    {
+        config(['whatsapp-gateway.device_suffix' => 'local']);
+
+        Http::fake([
+            'gateway.billnesia.com/disconnect/*' => Http::response(['success' => true]),
+        ]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->postJson('/whatsapp-gateway/disconnect')
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        // Sesi milik hosting ("agenda-surat") tidak boleh tersentuh.
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'http://gateway.billnesia.com/disconnect/agenda-surat-local');
+        Http::assertNotSent(fn (Request $request): bool => $request->url() === 'http://gateway.billnesia.com/disconnect/agenda-surat');
+    }
+
+    public function test_the_gateway_page_warns_when_the_device_id_is_shared(): void
+    {
+        // Akhiran dimatikan pada lingkungan non-production -> sesi berbagi.
+        config(['whatsapp-gateway.device_suffix' => '']);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/whatsapp-gateway')
+            ->assertOk()
+            ->assertSee('dipakai bersama oleh semua lingkungan')
+            ->assertSee('WHATSAPP_GATEWAY_DEVICE_SUFFIX');
+    }
+
+    public function test_the_gateway_page_shows_the_environment_suffix_without_warning(): void
+    {
+        config(['whatsapp-gateway.device_suffix' => 'local']);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/whatsapp-gateway')
+            ->assertOk()
+            ->assertSee('agenda-surat-local')
+            ->assertDontSee('dipakai bersama oleh semua lingkungan');
+    }
 
     public function test_only_admin_can_open_the_gateway_and_test_pages(): void
     {

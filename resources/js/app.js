@@ -3,6 +3,7 @@ import Swal from 'sweetalert2';
 import { initClassificationTable } from './klasifikasi-table';
 import { initServerDatatable } from './datatable';
 import { initIncomingLetters } from './surat-masuk';
+import { initIncomingLetterDisposition } from './surat-masuk-disposisi';
 import { initUserManagement } from './pengguna';
 import { initDateDisplays } from './date-display';
 import { initCsrfProtection } from './csrf';
@@ -316,6 +317,7 @@ onReady(() => {
      */
     initServerDatatable();
     initIncomingLetters();
+    initIncomingLetterDisposition();
     initUserManagement();
     initSettingsPage();
     initAgendas();

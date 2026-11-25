@@ -69,12 +69,20 @@ Route::middleware('auth')->group(function () {
     // Semua pengguna boleh membaca & mencetak surat masuk.
     Route::get('surat-masuk', [IncomingLetterController::class, 'index'])->name('surat-masuk.index');
     Route::get('surat-masuk/{incomingLetter}/cetak', [IncomingLetterController::class, 'print'])->name('surat-masuk.cetak');
+    Route::get('surat-masuk/{incomingLetter}/lampiran', [IncomingLetterController::class, 'attachment'])
+        ->name('surat-masuk.lampiran');
 
     // Pencatatan surat masuk hanya untuk Subbag Umum & Kepegawaian dan admin.
     Route::middleware('surat-masuk.manage')->group(function () {
         Route::post('surat-masuk', [IncomingLetterController::class, 'store'])->name('surat-masuk.store');
         Route::put('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'update'])->name('surat-masuk.update');
         Route::delete('surat-masuk/{incomingLetter}', [IncomingLetterController::class, 'destroy'])->name('surat-masuk.destroy');
+
+        // Disposisi surat masuk ke bidang (notifikasi WhatsApp + tautan unduh).
+        Route::get('surat-masuk/{incomingLetter}/disposisi', [IncomingLetterController::class, 'disposition'])
+            ->name('surat-masuk.disposisi');
+        Route::post('surat-masuk/{incomingLetter}/disposisi', [IncomingLetterController::class, 'sendDisposition'])
+            ->name('surat-masuk.disposisi.kirim');
     });
 
     Route::get('surat-keluar', [OutgoingLetterController::class, 'index'])->name('surat-keluar.index');

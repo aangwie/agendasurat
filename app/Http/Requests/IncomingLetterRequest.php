@@ -72,6 +72,8 @@ class IncomingLetterRequest extends FormRequest
             'subject' => ['required', 'string', 'max:255'],
             'sifat' => ['nullable', 'array'],
             'sifat.*' => ['string', Rule::in(array_keys(IncomingLetter::SIFAT_OPTIONS))],
+            // Lampiran surat (opsional): scan PDF atau gambar.
+            'attachment' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
         ];
     }
 
@@ -99,6 +101,9 @@ class IncomingLetterRequest extends FormRequest
             'subject.max' => 'Perihal maksimal 255 karakter.',
             'sifat.array' => 'Sifat surat tidak valid.',
             'sifat.*.in' => 'Pilihan sifat surat tidak dikenali.',
+            'attachment.file' => 'Lampiran gagal diunggah. Silakan pilih ulang berkas.',
+            'attachment.mimes' => 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).',
+            'attachment.max' => 'Ukuran lampiran maksimal 10 MB.',
         ];
     }
 
@@ -117,6 +122,7 @@ class IncomingLetterRequest extends FormRequest
             'sender' => 'asal surat',
             'subject' => 'perihal',
             'sifat' => 'sifat surat',
+            'attachment' => 'lampiran',
         ];
     }
 

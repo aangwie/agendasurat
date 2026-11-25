@@ -29,12 +29,36 @@ class WhatsappGatewayController extends Controller
             'defaultUrl' => $this->gateway->defaultUrl(),
             'baseUrl' => $this->gateway->baseUrl(),
             'deviceId' => $this->gateway->deviceId(),
+            'deviceSuffix' => $this->gateway->deviceSuffix(),
+            'deviceWarning' => $this->deviceWarning(),
             'session' => $this->gateway->savedSession(),
             'pollInterval' => max(2000, (int) config('whatsapp-gateway.poll_interval', 5000)),
             'notificationRecipients' => $recipients['admins'],
             'gatewayPhone' => $recipients['sender_phone'],
             'notificationsEnabled' => $this->notifier->enabled(),
         ]);
+    }
+
+    /**
+     * Peringatan bila device ID dipakai bersama antar lingkungan.
+     *
+     * Satu device ID = satu sesi Baileys di gateway, sehingga memutus koneksi
+     * pada satu lingkungan akan memutus lingkungan lain yang memakainya.
+     */
+    private function deviceWarning(): ?string
+    {
+        if ($this->gateway->deviceSuffix() !== '') {
+            return null;
+        }
+
+        if ($this->gateway->runsInProduction()) {
+            return null;
+        }
+
+        return 'Device ID "'.$this->gateway->deviceId().'" dipakai bersama oleh semua lingkungan yang '
+            .'memakai gateway ini. Memutus koneksi di sini akan memutus sesi di hosting juga. '
+            .'Isi WHATSAPP_GATEWAY_DEVICE_SUFFIX (mis. "local") atau ganti WHATSAPP_GATEWAY_DEVICE '
+            .'agar setiap instalasi memiliki sesi sendiri.';
     }
 
     /**

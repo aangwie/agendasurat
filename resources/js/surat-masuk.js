@@ -37,6 +37,25 @@ export function initIncomingLetters() {
         subject: form.querySelector('[name="subject"]'),
     };
 
+    const attachmentInput = form.querySelector('[data-letter-attachment]');
+    const attachmentCurrent = modal.querySelector('[data-letter-attachment-current]');
+    const attachmentCurrentName = modal.querySelector('[data-letter-attachment-name]');
+
+    const setCurrentAttachment = (name) => {
+        if (!attachmentCurrent) {
+            return;
+        }
+
+        const hasName = typeof name === 'string' && name.trim() !== '';
+
+        attachmentCurrent.style.display = hasName ? 'flex' : '';
+        attachmentCurrent.classList.toggle('hidden', !hasName);
+
+        if (attachmentCurrentName) {
+            attachmentCurrentName.textContent = hasName ? name : '';
+        }
+    };
+
     let lastFocused = null;
 
     const sifatCheckboxes = Array.from(form.querySelectorAll('[data-sifat-checkbox]'));
@@ -98,6 +117,7 @@ export function initIncomingLetters() {
         if (reset) {
             form.reset();
             setSifat([]);
+            setCurrentAttachment(null);
         }
 
         refreshDateDisplays();
@@ -116,6 +136,12 @@ export function initIncomingLetters() {
             });
 
             setSifat(payload.sifat);
+            setCurrentAttachment(payload.attachment_name ?? null);
+        }
+
+        // Berkas baru tidak boleh terbawa dari surat sebelumnya.
+        if (attachmentInput) {
+            attachmentInput.value = '';
         }
 
         refreshDateDisplays();

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\IncomingLetter;
 use App\Models\OutgoingLetter;
 use App\Models\TaskLetter;
 use App\Models\User;
@@ -111,6 +112,174 @@ class WhatsappNotifier
     public function taskLetterMessage(TaskLetter $letter): string
     {
         return $this->letterMessage('Surat Tugas Baru', $letter);
+    }
+
+    /**
+     * Daftar bidang (dari akun pengguna) yang dapat menerima disposisi.
+     *
+     * Satu bidang diwakili satu akun; bila ada beberapa akun pada bidang yang
+     * sama, akun yang memiliki nomor WhatsApp dipilih lebih dulu.
+     *
+     * @return Collection<int, array{kode_bidang: string, name: string, user: User, phone: ?string}>
+     */
+    public function bidangRecipients(): Collection
+    {
+        return User::query()
+            ->whereNotNull('kode_bidang')
+            ->where('kode_bidang', '<>', '')
+            ->orderBy('kode_bidang')
+            ->orderBy('name')
+            ->get()
+            ->groupBy('kode_bidang')
+            ->map(function (Collection $users, string $kodeBidang): array {
+                /** @var User $user */
+                $user = $users->first(fn (User $candidate): bool => filled($candidate->phone)) ?? $users->first();
+
+                return [
+                    'kode_bidang' => (string) $kodeBidang,
+                    'name' => (string) $user->name,
+                    'user' => $user,
+                    'phone' => filled($user->phone) ? $this->gateway->normalizePhone((string) $user->phone) : null,
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Kirim notifikasi disposisi surat masuk ke bidang yang dipilih.
+     *
+     * @param  Collection<int, array{kode_bidang: string, name: string, user: User, phone: ?string}>  $targets
+     * @return array{ok: bool, results: array<int, array{kode_bidang: string, name: string, user_id: int, phone: ?string, status: string, message: string}>}
+     */
+    public function notifyDisposition(IncomingLetter $letter, Collection $targets, string $senderName): array
+    {
+        $message = $this->dispositionMessage($letter, $senderName);
+        $timeout = max(3, (int) config('whatsapp-gateway.notify_timeout', 5));
+
+        // Nomor gateway tidak perlu dikirimi disposisi (perangkat sendiri).
+        $gatewayPhone = $this->gatewayPhone();
+        $health = null;
+        $results = [];
+
+        foreach ($targets as $target) {
+            $phone = $target['phone'];
+
+            if ($phone === null) {
+                $results[] = $this->dispositionResult($target, 'Bidang belum memiliki nomor WhatsApp.', 'skipped');
+
+                continue;
+            }
+
+            if ($phone === $gatewayPhone) {
+                $results[] = $this->dispositionResult($target, 'Nomor bidang sama dengan nomor gateway.', 'skipped');
+
+                continue;
+            }
+
+            // Cek kesehatan gateway sekali saja sebelum pengiriman pertama.
+            $health ??= $this->gateway->health($timeout);
+
+            if (! $health['ok']) {
+                $results[] = $this->dispositionResult($target, 'Gateway WhatsApp tidak dapat dihubungi.', 'failed');
+
+                continue;
+            }
+
+            try {
+                $result = $this->gateway->send($phone, $message, $timeout);
+            } catch (Throwable $exception) {
+                $result = ['ok' => false, 'message' => $exception->getMessage()];
+            }
+
+            $results[] = $result['ok']
+                ? $this->dispositionResult($target, 'Notifikasi disposisi terkirim.', 'sent')
+                : $this->dispositionResult($target, (string) ($result['message'] ?? 'Gagal dikirim.'), 'failed');
+        }
+
+        if (collect($results)->contains(fn (array $row): bool => $row['status'] === 'failed')) {
+            Log::warning('Sebagian notifikasi disposisi surat masuk gagal dikirim.', [
+                'letter_id' => $letter->id,
+                'results' => $results,
+            ]);
+        }
+
+        return [
+            'ok' => collect($results)->contains(fn (array $row): bool => $row['status'] === 'sent'),
+            'results' => $results,
+        ];
+    }
+
+    /**
+     * Susun isi pesan disposisi surat masuk beserta tautan unduhan.
+     */
+    public function dispositionMessage(IncomingLetter $letter, string $senderName): string
+    {
+        $lines = [
+            '*Disposisi Surat Masuk*',
+            '',
+            '*Nomor Agenda:* '.$letter->agenda_number,
+            '*Nomor Surat:* '.$letter->letter_number,
+            '*Asal Surat:* '.$letter->sender,
+            '*Perihal:* '.$letter->subject,
+            '*Tanggal Surat:* '.($letter->letter_date?->locale('id')->translatedFormat('j F Y') ?? '—'),
+            '*Diterima:* '.($letter->received_date?->locale('id')->translatedFormat('j F Y') ?? '—'),
+        ];
+
+        $sifat = $letter->sifatLabels();
+
+        if ($sifat !== []) {
+            $lines[] = '*Sifat:* '.implode(', ', $sifat);
+        }
+
+        $lines[] = '';
+        $lines[] = $letter->hasAttachment()
+            ? 'Silakan unduh lampiran surat melalui tautan berikut:'
+            : 'Silakan buka detail surat melalui tautan berikut:';
+        $lines[] = $this->publicUrl($letter);
+        $lines[] = '';
+        $lines[] = 'Didisposisikan oleh '.$senderName.'.';
+        $lines[] = (string) config('app.name', 'Agenda Surat');
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Tautan publik surat (lampiran bila ada, jika tidak halaman cetak).
+     *
+     * Nilai WHATSAPP_GATEWAY_PUBLIC_URL dipakai lebih dulu agar tautan tetap
+     * dapat dibuka penerima ketika APP_URL masih menunjuk localhost.
+     */
+    public function publicUrl(IncomingLetter $letter): string
+    {
+        $route = $letter->hasAttachment() ? 'surat-masuk.lampiran' : 'surat-masuk.cetak';
+        $url = route($route, ['incomingLetter' => $letter]);
+
+        $override = trim((string) config('whatsapp-gateway.attachment_public_url', ''));
+
+        if ($override === '') {
+            return $url;
+        }
+
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        return rtrim($override, '/').$path.($query ? '?'.$query : '');
+    }
+
+    /**
+     * @param  array{kode_bidang: string, name: string, user: User, phone: ?string}  $target
+     * @return array{kode_bidang: string, name: string, user_id: int, phone: ?string, status: string, message: string}
+     */
+    private function dispositionResult(array $target, string $message, string $status): array
+    {
+        return [
+            'kode_bidang' => $target['kode_bidang'],
+            'name' => $target['name'],
+            'user_id' => (int) $target['user']->id,
+            'phone' => $target['phone'],
+            'status' => $status,
+            'message' => $message,
+        ];
     }
 
     /**

@@ -252,6 +252,14 @@
                 </span>
             </div>
 
+            @if ($deviceWarning)
+                <div class="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800"
+                    role="alert">
+                    <x-icon name="shield-check" class="mt-0.5 size-4 shrink-0 text-amber-500" />
+                    <p>{{ $deviceWarning }}</p>
+                </div>
+            @endif
+
             <form data-wa-settings-form class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] lg:items-end">
                 <div>
                     <label for="gateway_url" class="form-label">
@@ -276,6 +284,15 @@
 
                     <input id="device_id" name="device_id" type="text" value="{{ $deviceId }}" maxlength="60"
                         required class="form-input font-mono text-xs">
+
+                    <p class="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+                        Nama sesi pada gateway. Gunakan device ID berbeda untuk setiap instalasi
+                        (lokal &amp; hosting) agar sesi tidak saling memutus.
+                        @if ($deviceSuffix !== '')
+                            Akhiran <span class="font-mono text-zinc-500">-{{ $deviceSuffix }}</span>
+                            dipakai otomatis untuk lingkungan ini.
+                        @endif
+                    </p>
 
                     @error('device_id')
                         <p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>
