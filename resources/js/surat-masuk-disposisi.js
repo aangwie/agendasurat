@@ -52,6 +52,9 @@ export function initIncomingLetterDisposition() {
     const attachmentLink = modal.querySelector('[data-disposisi-attachment-link]');
     const attachmentName = modal.querySelector('[data-disposisi-attachment-name]');
     const attachmentMeta = modal.querySelector('[data-disposisi-attachment-meta]');
+    const attachmentInput = modal.querySelector('[data-disposisi-attachment-input]');
+    const attachmentUploadButton = modal.querySelector('[data-disposisi-attachment-upload]');
+    const attachmentDeleteButton = modal.querySelector('[data-disposisi-attachment-delete]');
     const subtitle = modal.querySelector('[data-disposisi-subtitle]');
     const cancelSection = modal.querySelector('[data-disposisi-cancel-section]');
     const cancelList = modal.querySelector('[data-disposisi-cancel-list]');
@@ -72,6 +75,8 @@ export function initIncomingLetterDisposition() {
 
     let sendUrl = '';
     let cancelUrl = '';
+    let attachmentUploadUrl = '';
+    let attachmentDeleteUrl = '';
     let lastFocused = null;
     let activeButton = null;
     let bidangs = [];
@@ -285,6 +290,36 @@ export function initIncomingLetterDisposition() {
             .join('');
     };
 
+    /**
+     * Tampilkan status lampiran surat (nama, tautan unduh, tombol hapus).
+     */
+    const renderAttachment = (attachment = {}) => {
+        const available = attachment.available === true;
+
+        if (attachmentLink) {
+            attachmentLink.href = attachment.url ?? '#';
+            attachmentLink.style.display = available ? 'inline-flex' : '';
+            attachmentLink.classList.toggle('hidden', !available);
+        }
+
+        if (attachmentDeleteButton) {
+            attachmentDeleteButton.style.display = available ? 'inline-flex' : '';
+            attachmentDeleteButton.classList.toggle('hidden', !available);
+        }
+
+        if (attachmentName) {
+            attachmentName.textContent = available
+                ? (attachment.name ?? 'Lampiran surat')
+                : 'Belum ada lampiran';
+        }
+
+        if (attachmentMeta) {
+            attachmentMeta.textContent = available
+                ? 'Lampiran siap diunduh penerima disposisi.'
+                : 'Unggah lampiran di bawah ini agar penerima disposisi dapat mengunduhnya.';
+        }
+    };
+
     const renderLetter = (data) => {
         setText(fields.agenda, data.letter?.agenda_number);
         setText(fields.number, data.letter?.letter_number);
@@ -296,25 +331,7 @@ export function initIncomingLetterDisposition() {
             subtitle.textContent = `Surat ${data.letter?.agenda_number ?? ''} — ${data.letter?.sender ?? ''}`;
         }
 
-        const attachment = data.attachment ?? {};
-
-        if (attachmentLink) {
-            attachmentLink.href = attachment.url ?? '#';
-            attachmentLink.style.display = attachment.available ? 'inline-flex' : '';
-            attachmentLink.classList.toggle('hidden', !attachment.available);
-        }
-
-        if (attachmentName) {
-            attachmentName.textContent = attachment.available
-                ? (attachment.name ?? 'Lampiran surat')
-                : 'Belum ada lampiran';
-        }
-
-        if (attachmentMeta) {
-            attachmentMeta.textContent = attachment.available
-                ? 'Klik unduh untuk memeriksa berkas sebelum disposisi.'
-                : 'Unggah lampiran pada formulir surat agar penerima dapat mengunduhnya.';
-        }
+        renderAttachment(data.attachment ?? {});
     };
 
     const open = () => {
@@ -338,7 +355,13 @@ export function initIncomingLetterDisposition() {
         bidangs = [];
         sendUrl = '';
         cancelUrl = '';
+        attachmentUploadUrl = '';
+        attachmentDeleteUrl = '';
         hideResult();
+
+        if (attachmentInput) {
+            attachmentInput.value = '';
+        }
 
         if (cancelReason) {
             cancelReason.value = '';
@@ -368,6 +391,8 @@ export function initIncomingLetterDisposition() {
             bidangs = Array.isArray(data.bidangs) ? data.bidangs : [];
             sendUrl = data.send_url ?? '';
             cancelUrl = data.cancel_url ?? '';
+            attachmentUploadUrl = data.attachment?.upload_url ?? '';
+            attachmentDeleteUrl = data.attachment?.delete_url ?? '';
 
             renderLetter(data);
             renderBidangs();
@@ -539,6 +564,108 @@ export function initIncomingLetterDisposition() {
             first.focus();
         }
     });
+
+    /**
+     * Unggah lampiran surat dari popup disposisi.
+     */
+    const uploadAttachment = async () => {
+        const file = attachmentInput?.files?.[0] ?? null;
+
+        if (!file) {
+            setResult('error', 'Belum ada berkas dipilih', [
+                { name: 'Pilih berkas PDF atau gambar terlebih dahulu.', status: 'failed', label: 'Gagal' },
+            ]);
+
+            return;
+        }
+
+        if (!attachmentUploadUrl) {
+            setResult('error', 'Alamat unggah lampiran tidak tersedia', []);
+
+            return;
+        }
+
+        attachmentUploadButton?.setAttribute('disabled', 'disabled');
+        attachmentUploadButton?.classList.add('opacity-60');
+
+        try {
+            const body = new FormData();
+            body.append('attachment', file);
+
+            // Jangan set Content-Type: browser menambahkan boundary multipart.
+            const response = await fetch(attachmentUploadUrl, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body,
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const validation = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+
+                throw new Error(validation ?? payload.message ?? 'Lampiran gagal diunggah.');
+            }
+
+            renderAttachment(payload.attachment ?? {});
+
+            if (attachmentInput) {
+                attachmentInput.value = '';
+            }
+
+            setResult('success', payload.message ?? 'Lampiran surat berhasil diunggah.', []);
+        } catch (error) {
+            setResult('error', 'Lampiran gagal diunggah', [
+                { name: error.message, status: 'failed', label: 'Gagal' },
+            ]);
+        } finally {
+            attachmentUploadButton?.removeAttribute('disabled');
+            attachmentUploadButton?.classList.remove('opacity-60');
+        }
+    };
+
+    /**
+     * Hapus lampiran surat (dengan konfirmasi).
+     */
+    const deleteAttachment = async () => {
+        if (!attachmentDeleteUrl) {
+            return;
+        }
+
+        const confirmed = await askConfirmation(
+            'Hapus lampiran surat?',
+            'Lampiran akan dihapus sehingga tautan pada disposisi berikutnya tidak lagi tersedia.',
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(attachmentDeleteUrl, {
+                method: 'DELETE',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload.message ?? 'Lampiran gagal dihapus.');
+            }
+
+            renderAttachment(payload.attachment ?? {});
+            setResult('success', payload.message ?? 'Lampiran surat dihapus.', []);
+        } catch (error) {
+            setResult('error', 'Lampiran gagal dihapus', [
+                { name: error.message, status: 'failed', label: 'Gagal' },
+            ]);
+        }
+    };
+
+    attachmentUploadButton?.addEventListener('click', uploadAttachment);
+    attachmentDeleteButton?.addEventListener('click', deleteAttachment);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();

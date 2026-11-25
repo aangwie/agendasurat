@@ -32,7 +32,6 @@
             </div>
 
             <form data-letter-form method="POST" action="{{ route('surat-masuk.store') }}"
-                enctype="multipart/form-data"
                 data-store-action="{{ route('surat-masuk.store') }}"
                 data-update-template="{{ route('surat-masuk.update', ['incomingLetter' => '__ID__']) }}">
                 @csrf
@@ -125,32 +124,6 @@
                             </p>
                         @enderror
                     </fieldset>
-
-                    {{-- Lampiran surat (opsional) --}}
-                    <div>
-                        <label for="attachment" class="form-label">
-                            <x-icon name="paper-clip" class="size-4 text-zinc-400" />
-                            Lampiran Surat
-                        </label>
-
-                        <input id="attachment" name="attachment" type="file" data-letter-attachment
-                            accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-                            class="form-input py-2.5 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white">
-
-                        <p class="mt-1.5 text-xs text-zinc-400">
-                            Opsional. PDF atau gambar (JPG, PNG, WEBP), maksimal 10 MB.
-                            Lampiran ini ikut ditautkan pada notifikasi WhatsApp saat disposisi.
-                        </p>
-
-                        <p data-letter-attachment-current
-                            class="mt-2 hidden items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600">
-                            <x-icon name="paper-clip" class="size-3.5 shrink-0 text-zinc-400" />
-                            <span>Lampiran saat ini: <span data-letter-attachment-name
-                                    class="font-semibold"></span></span>
-                        </p>
-
-                        <x-form-error field="attachment" />
-                    </div>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <x-input-field name="received_date" label="Tanggal Diterima" icon="calendar" type="date"

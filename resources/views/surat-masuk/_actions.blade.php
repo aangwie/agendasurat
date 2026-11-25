@@ -22,7 +22,6 @@
             'sender' => $letter->sender,
             'subject' => $letter->subject,
             'sifat' => $letter->sifat ?? [],
-            'attachment_name' => $letter->attachment_name,
             'update_url' => route('surat-masuk.update', $letter),
         ]) }}"
         title="Edit surat" aria-label="Edit surat {{ $letter->agenda_number }}"

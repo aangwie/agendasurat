@@ -85,6 +85,12 @@ Route::middleware('auth')->group(function () {
             ->name('surat-masuk.disposisi.kirim');
         Route::delete('surat-masuk/{incomingLetter}/disposisi', [IncomingLetterController::class, 'cancelDisposition'])
             ->name('surat-masuk.disposisi.batal');
+
+        // Lampiran surat diunggah dari popup disposisi (bukan saat mencatat surat).
+        Route::post('surat-masuk/{incomingLetter}/lampiran', [IncomingLetterController::class, 'uploadAttachment'])
+            ->name('surat-masuk.lampiran.unggah');
+        Route::delete('surat-masuk/{incomingLetter}/lampiran', [IncomingLetterController::class, 'removeAttachment'])
+            ->name('surat-masuk.lampiran.hapus');
     });
 
     Route::get('surat-keluar', [OutgoingLetterController::class, 'index'])->name('surat-keluar.index');

@@ -60,9 +60,12 @@
                         </dl>
                     </div>
 
-                    {{-- Lampiran surat --}}
+                    {{-- Lampiran surat: diunggah di sini, bukan pada form surat --}}
                     <div>
-                        <p class="text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Lampiran Surat</p>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Lampiran Surat</p>
+                            <span class="text-[11px] text-zinc-400">PDF / gambar, maks. 10 MB</span>
+                        </div>
 
                         <div data-disposisi-attachment
                             class="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 px-3 py-2.5">
@@ -78,16 +81,36 @@
                                         Belum ada lampiran
                                     </span>
                                     <span data-disposisi-attachment-meta class="block text-[11px] text-zinc-400">
-                                        Unggah lampiran pada formulir surat agar penerima dapat mengunduhnya.
+                                        Unggah lampiran di bawah ini agar penerima disposisi dapat mengunduhnya.
                                     </span>
                                 </span>
                             </span>
 
-                            <a data-disposisi-attachment-link href="#" target="_blank" rel="noopener"
-                                class="btn btn-secondary hidden py-1.5 text-xs">
-                                <x-icon name="arrow-down-tray" class="size-3.5" />
-                                Unduh
-                            </a>
+                            <span class="flex shrink-0 items-center gap-1">
+                                <a data-disposisi-attachment-link href="#" target="_blank" rel="noopener"
+                                    class="btn btn-secondary hidden py-1.5 text-xs">
+                                    <x-icon name="arrow-down-tray" class="size-3.5" />
+                                    Unduh
+                                </a>
+
+                                <button type="button" data-disposisi-attachment-delete
+                                    class="btn hidden border border-rose-200 bg-white py-1.5 text-xs text-rose-700 hover:bg-rose-50"
+                                    title="Hapus lampiran">
+                                    <x-icon name="trash" class="size-3.5" />
+                                </button>
+                            </span>
+                        </div>
+
+                        <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                            <input type="file" data-disposisi-attachment-input
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                                class="form-input py-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white">
+
+                            <button type="button" data-disposisi-attachment-upload
+                                class="btn btn-secondary shrink-0 py-2 text-xs">
+                                <x-icon name="arrow-up-tray" class="size-3.5" />
+                                Unggah Lampiran
+                            </button>
                         </div>
                     </div>
 

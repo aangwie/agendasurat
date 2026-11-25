@@ -77,7 +77,7 @@ class IncomingLetterController extends Controller
      */
     public function store(IncomingLetterRequest $request): RedirectResponse
     {
-        $letter = IncomingLetter::create($this->letterData($request));
+        $letter = IncomingLetter::create($request->validated());
 
         return redirect()
             ->route('surat-masuk.index')
@@ -89,35 +89,11 @@ class IncomingLetterController extends Controller
      */
     public function update(IncomingLetterRequest $request, IncomingLetter $incomingLetter): RedirectResponse
     {
-        $incomingLetter->update($this->letterData($request, $incomingLetter));
+        $incomingLetter->update($request->validated());
 
         return redirect()
             ->route('surat-masuk.index')
             ->with('status', "Surat masuk {$incomingLetter->agenda_number} berhasil diperbarui.");
-    }
-
-    /**
-     * Data surat yang siap disimpan, termasuk lampiran bila diunggah.
-     *
-     * @return array<string, mixed>
-     */
-    private function letterData(IncomingLetterRequest $request, ?IncomingLetter $letter = null): array
-    {
-        $data = $request->safe()->except('attachment');
-
-        $file = $request->file('attachment');
-
-        if ($file === null) {
-            return $data;
-        }
-
-        // Lampiran lama diganti: hapus berkas sebelumnya agar tidak menumpuk.
-        $letter?->deleteAttachment();
-
-        $data['attachment_path'] = $file->store('incoming-letters', IncomingLetter::ATTACHMENT_DISK);
-        $data['attachment_name'] = $file->getClientOriginalName();
-
-        return $data;
     }
 
     /**
@@ -148,6 +124,66 @@ class IncomingLetterController extends Controller
         abort_unless($disk->exists($path), 404);
 
         return $disk->download($path, $incomingLetter->attachmentLabel());
+    }
+
+    /**
+     * Unggah/ganti lampiran surat dari popup disposisi.
+     *
+     * Lampiran diunggah saat mendisposisikan surat (bukan saat mencatat surat),
+     * agar tautan unduhan pada notifikasi WhatsApp selalu tersedia.
+     */
+    public function uploadAttachment(Request $request, IncomingLetter $incomingLetter): JsonResponse
+    {
+        $request->validate([
+            'attachment' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+        ], [
+            'attachment.required' => 'Pilih berkas lampiran terlebih dahulu.',
+            'attachment.file' => 'Lampiran gagal diunggah. Silakan pilih ulang berkas.',
+            'attachment.mimes' => 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).',
+            'attachment.max' => 'Ukuran lampiran maksimal 10 MB.',
+        ], [
+            'attachment' => 'lampiran',
+        ]);
+
+        $file = $request->file('attachment');
+        abort_if($file === null, 422);
+
+        // Lampiran lama diganti: hapus berkas sebelumnya agar tidak menumpuk.
+        $incomingLetter->deleteAttachment();
+
+        $incomingLetter->update([
+            'attachment_path' => $file->store('incoming-letters', IncomingLetter::ATTACHMENT_DISK),
+            'attachment_name' => $file->getClientOriginalName(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Lampiran surat berhasil diunggah.',
+            'attachment' => [
+                'available' => true,
+                'name' => $incomingLetter->attachmentLabel(),
+                'url' => route('surat-masuk.lampiran', $incomingLetter),
+            ],
+        ]);
+    }
+
+    /**
+     * Hapus lampiran surat dari popup disposisi.
+     */
+    public function removeAttachment(IncomingLetter $incomingLetter): JsonResponse
+    {
+        $incomingLetter->deleteAttachment();
+        $incomingLetter->update(['attachment_path' => null, 'attachment_name' => null]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Lampiran surat dihapus.',
+            'attachment' => [
+                'available' => false,
+                'name' => null,
+                'url' => null,
+            ],
+        ]);
     }
 
     /**
@@ -198,6 +234,8 @@ class IncomingLetterController extends Controller
                 'available' => $incomingLetter->hasAttachment(),
                 'name' => $incomingLetter->attachmentLabel(),
                 'url' => route('surat-masuk.lampiran', $incomingLetter),
+                'upload_url' => route('surat-masuk.lampiran.unggah', $incomingLetter),
+                'delete_url' => route('surat-masuk.lampiran.hapus', $incomingLetter),
             ],
             'bidangs' => $bidangs,
             'send_url' => route('surat-masuk.disposisi.kirim', $incomingLetter),

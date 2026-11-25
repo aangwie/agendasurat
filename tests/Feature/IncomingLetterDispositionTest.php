@@ -86,16 +86,19 @@ class IncomingLetterDispositionTest extends TestCase
             'phone' => null,
         ]);
 
-        $letter = IncomingLetter::create($this->payload());
+        $letter = IncomingLetter::create($this->payload(['agenda_number' => '1701']));
 
+        // Lampiran diunggah dari popup disposisi, bukan dari form surat.
         $this->actingAs($manager)
-            ->post(route('surat-masuk.store'), $this->payload([
-                'agenda_number' => '1701',
+            ->post(route('surat-masuk.lampiran.unggah', $letter), [
                 'attachment' => UploadedFile::fake()->create('surat-edaran.pdf', 120, 'application/pdf'),
-            ]))
-            ->assertRedirect(route('surat-masuk.index'));
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('attachment.available', true)
+            ->assertJsonPath('attachment.name', 'surat-edaran.pdf');
 
-        $stored = IncomingLetter::query()->where('agenda_number', '1701')->firstOrFail();
+        $stored = $letter->fresh();
 
         $this->assertTrue($stored->hasAttachment());
         $this->assertSame('surat-edaran.pdf', $stored->attachment_name);
@@ -107,7 +110,8 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertJsonPath('ok', true)
             ->assertJsonPath('letter.agenda_number', '1701')
             ->assertJsonPath('attachment.available', true)
-            ->assertJsonPath('attachment.name', 'surat-edaran.pdf');
+            ->assertJsonPath('attachment.name', 'surat-edaran.pdf')
+            ->assertJsonStructure(['attachment' => ['upload_url', 'delete_url']]);
 
         $bidangs = collect($response->json('bidangs'));
 
@@ -118,9 +122,28 @@ class IncomingLetterDispositionTest extends TestCase
 
         $this->assertTrue($bidangs->contains(fn (array $row): bool => $row['kode_bidang'] === '408.37.02'
             && $row['can_receive'] === false));
+    }
 
-        // Lampiran lama tidak tersentuh saat surat lain dibuat.
-        $this->assertTrue($letter->fresh()->hasAttachment() === false);
+    public function test_the_letter_form_no_longer_accepts_an_attachment(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+
+        $manager = $this->manager();
+
+        $this->actingAs($manager)->post(route('surat-masuk.store'), $this->payload([
+            'attachment' => UploadedFile::fake()->create('ignored.pdf', 20, 'application/pdf'),
+        ]))->assertRedirect(route('surat-masuk.index'));
+
+        $letter = IncomingLetter::query()->firstOrFail();
+
+        // Berkas tidak disimpan karena lampiran hanya diunggah dari disposisi.
+        $this->assertFalse($letter->hasAttachment());
+        $this->assertCount(0, Storage::disk(IncomingLetter::ATTACHMENT_DISK)->files('incoming-letters'));
+
+        $this->actingAs($manager)
+            ->get('/surat-masuk')
+            ->assertOk()
+            ->assertDontSee('data-letter-attachment', escape: false);
     }
 
     public function test_the_attachment_can_be_downloaded_by_logged_in_users(): void
@@ -128,17 +151,77 @@ class IncomingLetterDispositionTest extends TestCase
         Storage::fake(IncomingLetter::ATTACHMENT_DISK);
 
         $manager = $this->manager();
+        $letter = IncomingLetter::create($this->payload());
 
-        $this->actingAs($manager)->post(route('surat-masuk.store'), $this->payload([
+        $this->actingAs($manager)->post(route('surat-masuk.lampiran.unggah', $letter), [
             'attachment' => UploadedFile::fake()->create('scan-surat.pdf', 60, 'application/pdf'),
-        ]));
-
-        $letter = IncomingLetter::query()->firstOrFail();
+        ], ['Accept' => 'application/json']);
 
         $this->actingAs($manager)
             ->get(route('surat-masuk.lampiran', $letter))
             ->assertOk()
             ->assertDownload('scan-surat.pdf');
+    }
+
+    public function test_the_attachment_can_be_replaced_and_removed_from_the_disposition_popup(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+
+        $manager = $this->manager();
+        $letter = IncomingLetter::create($this->payload());
+
+        $this->actingAs($manager)
+            ->post(route('surat-masuk.lampiran.unggah', $letter), [
+                'attachment' => UploadedFile::fake()->create('lama.pdf', 10, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $firstPath = (string) $letter->fresh()->attachment_path;
+
+        $this->actingAs($manager)
+            ->post(route('surat-masuk.lampiran.unggah', $letter), [
+                'attachment' => UploadedFile::fake()->create('baru.pdf', 12, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('attachment.name', 'baru.pdf');
+
+        Storage::disk(IncomingLetter::ATTACHMENT_DISK)->assertMissing($firstPath);
+
+        $this->actingAs($manager)
+            ->deleteJson(route('surat-masuk.lampiran.hapus', $letter))
+            ->assertOk()
+            ->assertJsonPath('attachment.available', false);
+
+        $this->assertFalse($letter->fresh()->hasAttachment());
+        $this->assertCount(0, Storage::disk(IncomingLetter::ATTACHMENT_DISK)->files('incoming-letters'));
+    }
+
+    public function test_uploading_an_unsupported_attachment_is_rejected(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        $this->actingAs($this->manager())
+            ->post(route('surat-masuk.lampiran.unggah', $letter), [
+                'attachment' => UploadedFile::fake()->create('skrip.exe', 10, 'application/x-msdownload'),
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['attachment']);
+    }
+
+    public function test_only_the_letter_manager_can_upload_the_attachment(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+
+        $letter = IncomingLetter::create($this->payload());
+        $reader = User::factory()->create(['is_admin' => false, 'kode_bidang' => '408.37.03']);
+
+        $this->actingAs($reader)
+            ->post(route('surat-masuk.lampiran.unggah', $letter), [
+                'attachment' => UploadedFile::fake()->create('scan.pdf', 10, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertForbidden();
     }
 
     public function test_sending_the_disposition_notifies_each_selected_bidang_with_a_download_link(): void
@@ -166,11 +249,11 @@ class IncomingLetterDispositionTest extends TestCase
             'phone' => null,
         ]);
 
-        $this->actingAs($manager)->post(route('surat-masuk.store'), $this->payload([
-            'attachment' => UploadedFile::fake()->create('surat-edaran.pdf', 90, 'application/pdf'),
-        ]));
+        $letter = IncomingLetter::create($this->payload());
 
-        $letter = IncomingLetter::query()->firstOrFail();
+        $this->actingAs($manager)->post(route('surat-masuk.lampiran.unggah', $letter), [
+            'attachment' => UploadedFile::fake()->create('surat-edaran.pdf', 90, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertOk();
 
         Http::fake([
             'gateway.billnesia.com/health' => Http::response(['status' => 'online']),
@@ -475,7 +558,9 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertSee('data-letter-disposisi', escape: false)
             ->assertSee('data-disposisi-modal', escape: false)
             ->assertSee('data-disposisi-form', escape: false)
-            ->assertSee('data-letter-attachment', escape: false)
+            ->assertSee('data-disposisi-attachment-input', escape: false)
+            ->assertSee('data-disposisi-attachment-upload', escape: false)
+            ->assertSee('Unggah Lampiran')
             ->assertSee('data-disposisi-cancel-section', escape: false)
             ->assertSee('data-disposisi-cancel-list', escape: false)
             ->assertSee('Batalkan Disposisi yang Salah')

@@ -220,17 +220,17 @@ urutan field: **Tanggal Surat**, **Nomor Surat**, **Asal Surat**, **Perihal**,
 - Aksi per baris memakai ikon: **cetak** (`printer`), **disposisi** (`share`),
   **edit** (`pencil`), dan **hapus** (`trash`). Penghapusan dikonfirmasi dengan
   **SweetAlert2**.
-- **Lampiran surat** (opsional) dapat diunggah pada formulir: PDF atau gambar
-  (JPG/PNG/WEBP), maksimal 10 MB. Berkas disimpan pada disk **privat**
-  (`storage/app/private/incoming-letters`) dan hanya dapat diunduh pengguna yang
-  sudah login lewat `/surat-masuk/{id}/lampiran`.
 
 ### Disposisi surat masuk
 
 Tombol **disposisi** pada kolom aksi membuka popup berisi:
 
-- ringkasan surat (nomor agenda, nomor surat, perihal, asal, tanggal) dan
-  **lampiran surat** dengan tombol **Unduh** (bila lampiran tersedia);
+- ringkasan surat (nomor agenda, nomor surat, perihal, asal, tanggal);
+- **lampiran surat** — diunggah **di sini** (bukan pada formulir tambah surat):
+  PDF atau gambar (JPG/PNG/WEBP), maksimal 10 MB. Tersedia tombol
+  **Unggah Lampiran** (mengganti berkas lama), **Unduh**, dan **Hapus**. Berkas
+  disimpan pada disk **privat** (`storage/app/private/incoming-letters`) dan
+  hanya dapat diunduh pengguna yang sudah login lewat `/surat-masuk/{id}/lampiran`;
 - **ceklist nama bidang** — diambil dari akun pengguna yang memiliki
   `kode_bidang` (satu bidang = satu akun, akun bernomor WhatsApp dipilih lebih
   dulu). Bidang tanpa nomor WhatsApp ditandai dan tidak dapat dicentang;
