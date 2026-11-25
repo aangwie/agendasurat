@@ -440,6 +440,15 @@ export function initWhatsappTest() {
     const connectionDot = root.querySelector('[data-wa-test-dot]');
     const connectionLabel = root.querySelector('[data-wa-test-label]');
     const connectionStatus = root.querySelector('[data-wa-test-status]');
+    const attachmentInput = form?.querySelector('[data-wa-attachment]');
+    const attachmentPreview = root.querySelector('[data-wa-attachment-preview]');
+    const attachmentThumb = root.querySelector('[data-wa-attachment-thumb]');
+    const attachmentIcon = root.querySelector('[data-wa-attachment-icon]');
+    const attachmentName = root.querySelector('[data-wa-attachment-name]');
+    const attachmentMeta = root.querySelector('[data-wa-attachment-meta]');
+    const attachmentClear = root.querySelector('[data-wa-attachment-clear]');
+    const maxAttachmentKb = Number(root.dataset.maxAttachmentKb ?? 0) || 8192;
+    const maxAttachmentBytes = maxAttachmentKb * 1024;
     const sessionPhone = root.dataset.sessionPhone ?? '';
 
     const history = [];
@@ -495,7 +504,10 @@ export function initWhatsappTest() {
 
             const note = document.createElement('span');
             note.className = 'block truncate text-[11px] text-zinc-500';
-            note.textContent = entry.message;
+            note.textContent = entry.attachment
+                ? `${entry.message || 'Tanpa pesan'} · Lampiran: ${entry.attachment}`
+                : entry.message;
+            note.title = note.textContent;
 
             info.append(phone, note);
 
@@ -513,6 +525,97 @@ export function initWhatsappTest() {
         history.splice(10);
         renderHistory();
     };
+
+    let attachmentUrl = null;
+
+    const formatSize = (bytes) => {
+        if (bytes >= 1024 * 1024) {
+            return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+        }
+
+        return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    };
+
+    const currentAttachment = () => attachmentInput?.files?.[0] ?? null;
+
+    const renderAttachment = () => {
+        const file = currentAttachment();
+
+        if (attachmentUrl) {
+            URL.revokeObjectURL(attachmentUrl);
+            attachmentUrl = null;
+        }
+
+        if (!attachmentPreview) {
+            return;
+        }
+
+        // `display` diatur lewat style agar tidak bergantung pada urutan utility Tailwind.
+        attachmentPreview.style.display = file ? 'flex' : '';
+
+        if (!file) {
+            attachmentPreview.classList.add('hidden');
+
+            if (attachmentThumb) {
+                attachmentThumb.classList.add('hidden');
+                attachmentThumb.removeAttribute('src');
+            }
+
+            return;
+        }
+
+        attachmentPreview.classList.remove('hidden');
+
+        if (attachmentName) {
+            attachmentName.textContent = file.name;
+        }
+
+        if (attachmentMeta) {
+            attachmentMeta.textContent = `${formatSize(file.size)} · ${file.type || 'berkas'}`;
+        }
+
+        const isImage = file.type.startsWith('image/');
+
+        if (attachmentThumb && isImage) {
+            attachmentUrl = URL.createObjectURL(file);
+            attachmentThumb.src = attachmentUrl;
+            attachmentThumb.classList.remove('hidden');
+        } else if (attachmentThumb) {
+            attachmentThumb.classList.add('hidden');
+            attachmentThumb.removeAttribute('src');
+        }
+
+        attachmentIcon?.classList.toggle('hidden', isImage);
+    };
+
+    const clearAttachment = () => {
+        if (attachmentInput) {
+            attachmentInput.value = '';
+        }
+
+        renderAttachment();
+    };
+
+    attachmentInput?.addEventListener('change', () => {
+        const file = currentAttachment();
+
+        if (file && file.size > maxAttachmentBytes) {
+            setResult(
+                'error',
+                'Lampiran terlalu besar',
+                `Ukuran maksimal ${Math.round(maxAttachmentKb / 1024)} MB.`,
+            );
+            clearAttachment();
+
+            return;
+        }
+
+        renderAttachment();
+    });
+
+    attachmentClear?.addEventListener('click', clearAttachment);
+
+    renderAttachment();
 
     const updateCounter = () => {
         if (counter) {
@@ -543,13 +646,29 @@ export function initWhatsappTest() {
     form?.addEventListener('submit', async (event) => {
         event.preventDefault();
 
+        const file = currentAttachment();
+        const text = message?.value.trim() ?? '';
         const payload = {
             recipient: recipient?.value.trim() ?? '',
-            message: message?.value ?? '',
+            message: text,
         };
 
-        if (!payload.recipient || !payload.message.trim()) {
-            setResult('error', 'Data belum lengkap', 'Nomor tujuan dan isi pesan wajib diisi.');
+        if (!payload.recipient) {
+            setResult('error', 'Data belum lengkap', 'Nomor tujuan wajib diisi.');
+            return;
+        }
+
+        if (!payload.message && !file) {
+            setResult('error', 'Data belum lengkap', 'Isi pesan atau pilih lampiran terlebih dahulu.');
+            return;
+        }
+
+        if (file && file.size > maxAttachmentBytes) {
+            setResult(
+                'error',
+                'Lampiran terlalu besar',
+                `Ukuran maksimal ${Math.round(maxAttachmentKb / 1024)} MB.`,
+            );
             return;
         }
 
@@ -559,11 +678,25 @@ export function initWhatsappTest() {
         const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
 
         try {
-            const result = await requestJson(root.dataset.sendUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            let requestOptions;
+
+            if (file) {
+                const body = new FormData();
+                body.append('recipient', payload.recipient);
+                body.append('message', payload.message);
+                body.append('attachment', file);
+
+                // Jangan set Content-Type: browser menambahkan boundary multipart.
+                requestOptions = { method: 'POST', body };
+            } else {
+                requestOptions = {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                };
+            }
+
+            const result = await requestJson(root.dataset.sendUrl, requestOptions);
 
             setResult(
                 result.ok ? 'success' : 'error',
@@ -573,16 +706,22 @@ export function initWhatsappTest() {
 
             pushHistory({
                 recipient: result.recipient ?? payload.recipient,
-                message: payload.message.trim().slice(0, 80),
+                message: payload.message.slice(0, 80),
+                attachment: file?.name ?? null,
                 ok: result.ok === true,
                 time,
             });
+
+            if (result.ok) {
+                clearAttachment();
+            }
         } catch (error) {
             setResult('error', 'Pengiriman gagal', error.message);
 
             pushHistory({
                 recipient: payload.recipient,
-                message: payload.message.trim().slice(0, 80),
+                message: payload.message.slice(0, 80),
+                attachment: file?.name ?? null,
                 ok: false,
                 time,
             });

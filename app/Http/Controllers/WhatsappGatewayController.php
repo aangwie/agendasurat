@@ -7,6 +7,7 @@ use App\Services\WhatsappGatewayService;
 use App\Services\WhatsappNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 
 class WhatsappGatewayController extends Controller
@@ -159,29 +160,72 @@ class WhatsappGatewayController extends Controller
             'session' => $session,
             'users' => $users,
             'prefillRecipient' => old('recipient', $session['phone_number']),
+            'maxAttachmentKb' => $this->attachmentMaxKb(),
+            'attachmentWarning' => $this->attachmentWarning(),
         ]);
     }
 
     /**
+     * Peringatan bila URL lampiran tidak dapat diunduh gateway.
+     */
+    private function attachmentWarning(): ?string
+    {
+        $override = trim((string) config('whatsapp-gateway.attachment_public_url', ''));
+        $base = $override !== '' ? $override : (string) config('app.url');
+        $host = strtolower((string) parse_url($base, PHP_URL_HOST));
+
+        if (! in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true)) {
+            return null;
+        }
+
+        return 'URL lampiran masih memakai "'.$host.'" sehingga gateway tidak dapat mengunduhnya '
+            .'(gejala: "Request failed with status code 404"). Set APP_URL ke domain publik atau isi '
+            .'WHATSAPP_GATEWAY_PUBLIC_URL, lalu jalankan "php artisan storage:link".';
+    }
+
+    /**
+     * Batas ukuran lampiran (KB) dari konfigurasi.
+     */
+    private function attachmentMaxKb(): int
+    {
+        return max(1024, (int) config('whatsapp-gateway.attachment_max_kb', 8192));
+    }
+
+    /**
      * Kirim pesan uji melalui gateway.
+     *
+     * Lampiran bersifat opsional; bila dikirim, pesan diteruskan sebagai
+     * multipart/form-data ke endpoint media gateway.
      */
     public function sendTest(Request $request): JsonResponse
     {
+        $maxKb = $this->attachmentMaxKb();
+
         $data = $request->validate([
             'recipient' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9][0-9\s().-]{6,}$/'],
-            'message' => ['required', 'string', 'max:4096'],
+            'message' => ['nullable', 'string', 'max:4096', 'required_without:attachment'],
+            'attachment' => ['nullable', 'file', 'max:'.$maxKb, 'mimes:pdf,jpg,jpeg,png,webp'],
         ], [
             'recipient.required' => 'Nomor tujuan wajib diisi.',
             'recipient.regex' => 'Nomor tujuan tidak valid. Gunakan format 08xx atau 62xx.',
-            'message.required' => 'Isi pesan wajib diisi.',
+            'message.required_without' => 'Isi pesan atau lampiran wajib diisi.',
             'message.max' => 'Pesan maksimal 4096 karakter.',
+            'attachment.file' => 'Lampiran gagal diunggah. Silakan pilih ulang berkas.',
+            'attachment.max' => 'Ukuran lampiran maksimal '.intdiv($maxKb, 1024).' MB.',
+            'attachment.mimes' => 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).',
         ], [
             'recipient' => 'nomor tujuan',
             'message' => 'pesan',
+            'attachment' => 'lampiran',
         ]);
 
-        return response()->json(
-            $this->gateway->send($data['recipient'], $data['message']),
-        );
+        $attachment = $request->file('attachment');
+        $message = (string) ($data['message'] ?? '');
+
+        $result = $attachment instanceof UploadedFile
+            ? $this->gateway->sendMedia($data['recipient'], $message, $attachment)
+            : $this->gateway->send($data['recipient'], $message);
+
+        return response()->json($result);
     }
 }

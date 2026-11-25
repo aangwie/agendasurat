@@ -6,7 +6,9 @@ use App\Models\AppSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class WhatsappGatewayTest extends TestCase
@@ -222,6 +224,207 @@ class WhatsappGatewayTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['recipient', 'message']);
+    }
+
+    public function test_the_test_page_shows_the_attachment_field(): void
+    {
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/whatsapp-gateway/uji-pesan')
+            ->assertOk()
+            ->assertSee('data-wa-attachment', escape: false)
+            ->assertSee('data-wa-attachment-preview', escape: false)
+            ->assertSee('data-wa-attachment-clear', escape: false)
+            ->assertSee('Lampiran')
+            ->assertSee('maksimal 8 MB.');
+    }
+
+    public function test_the_test_page_warns_when_the_attachment_url_is_local(): void
+    {
+        config(['app.url' => 'http://localhost', 'whatsapp-gateway.attachment_public_url' => null]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/whatsapp-gateway/uji-pesan')
+            ->assertOk()
+            ->assertSee('WHATSAPP_GATEWAY_PUBLIC_URL')
+            ->assertSee('storage:link');
+    }
+
+    public function test_the_test_page_hides_the_warning_when_a_public_url_is_configured(): void
+    {
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get('/whatsapp-gateway/uji-pesan')
+            ->assertOk()
+            ->assertDontSee('Request failed with status code 404');
+    }
+
+    public function test_an_image_attachment_is_forwarded_to_the_media_endpoint(): void
+    {
+        Storage::fake('public');
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        Http::fake([
+            'gateway.billnesia.com/send-media' => Http::response(['success' => true, 'messageId' => 'MEDIA-1']),
+        ]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '0812-3456-7890',
+                'message' => 'Lampiran surat tugas',
+                'attachment' => UploadedFile::fake()->create('bukti.png', 120, 'image/png'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message_id' => 'MEDIA-1',
+                'recipient' => '6281234567890',
+                'via' => 'media',
+                'attachment' => [
+                    'name' => 'bukti.png',
+                    'mime' => 'image/png',
+                    'size' => 122880,
+                ],
+            ]);
+
+        // Kontrak gateway: device_id, recipient, type, url/file_path, caption.
+        Http::assertSent(function (Request $request): bool {
+            return $request->url() === 'http://gateway.billnesia.com/send-media'
+                && $request->isJson()
+                && $request['device_id'] === 'agenda-surat'
+                && $request['recipient'] === '6281234567890'
+                && $request['type'] === 'image'
+                && $request['caption'] === 'Lampiran surat tugas'
+                && str_contains((string) $request['url'], 'https://agenda.example.go.id/storage/whatsapp/attachments/')
+                && $request['file_path'] !== '';
+        });
+
+        $this->assertCount(1, Storage::disk('public')->files('whatsapp/attachments'));
+    }
+
+    public function test_a_pdf_attachment_is_sent_as_a_download_link(): void
+    {
+        Storage::fake('public');
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        Http::fake([
+            'gateway.billnesia.com/send-media' => Http::response(
+                ['error' => 'Invalid media type. Supported: image, video, audio'],
+                400,
+            ),
+            'gateway.billnesia.com/send' => Http::response(['success' => true, 'messageId' => 'LINK-1']),
+        ]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '6281234567890',
+                'message' => 'Surat tugas',
+                'attachment' => UploadedFile::fake()->create('surat-tugas.pdf', 120, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message_id' => 'LINK-1',
+                'via' => 'link',
+                'attachment' => ['name' => 'surat-tugas.pdf'],
+            ]);
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'http://gateway.billnesia.com/send') {
+                return false;
+            }
+
+            $message = (string) ($request['pesan'] ?? '');
+
+            return ($request['nomor_penerima'] ?? null) === '6281234567890'
+                && str_contains($message, 'Surat tugas')
+                && str_contains($message, 'Lampiran: surat-tugas.pdf')
+                && str_contains($message, 'https://agenda.example.go.id/storage/whatsapp/attachments/');
+        });
+    }
+
+    public function test_the_message_is_optional_when_an_attachment_is_present(): void
+    {
+        Storage::fake('public');
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        Http::fake([
+            'gateway.billnesia.com/send-media' => Http::response(['success' => true]),
+        ]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '6281234567890',
+                'attachment' => UploadedFile::fake()->create('foto.jpg', 20, 'image/jpeg'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'via' => 'media', 'attachment' => ['name' => 'foto.jpg']]);
+
+        Http::assertSent(function (Request $request): bool {
+            return $request->url() === 'http://gateway.billnesia.com/send-media'
+                && $request['type'] === 'image'
+                && $request['caption'] === '';
+        });
+    }
+
+    public function test_an_unsupported_attachment_type_is_rejected(): void
+    {
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '6281234567890',
+                'message' => 'Lampiran',
+                'attachment' => UploadedFile::fake()->create('skrip.exe', 10, 'application/x-msdownload'),
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['attachment']);
+    }
+
+    public function test_an_attachment_with_a_localhost_url_is_rejected_before_calling_the_gateway(): void
+    {
+        Storage::fake('public');
+        config(['app.url' => 'http://localhost', 'whatsapp-gateway.attachment_public_url' => null]);
+
+        Http::fake();
+
+        $response = $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '6281234567890',
+                'attachment' => UploadedFile::fake()->create('bukti.png', 20, 'image/png'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('ok', false);
+
+        $message = (string) $response->json('message');
+
+        $this->assertStringContainsString('hanya bisa diakses dari server ini', $message);
+        $this->assertStringContainsString('WHATSAPP_GATEWAY_PUBLIC_URL', $message);
+
+        // Gateway tidak boleh dipanggil dan berkas tidak boleh tertinggal.
+        Http::assertNothingSent();
+        $this->assertCount(0, Storage::disk('public')->files('whatsapp/attachments'));
+    }
+
+    public function test_a_gateway_download_failure_is_explained_in_indonesian(): void
+    {
+        Storage::fake('public');
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        Http::fake([
+            'gateway.billnesia.com/send-media' => Http::response(['error' => 'Request failed with status code 404'], 500),
+        ]);
+
+        $response = $this->actingAs(User::factory()->admin()->create())
+            ->post('/whatsapp-gateway/uji-pesan', [
+                'recipient' => '6281234567890',
+                'attachment' => UploadedFile::fake()->create('bukti.png', 20, 'image/png'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('ok', false);
+
+        $message = (string) $response->json('message');
+
+        $this->assertStringContainsString('Gateway gagal mengunduh lampiran dari', $message);
+        $this->assertStringContainsString('storage:link', $message);
     }
 
     public function test_disconnecting_clears_the_saved_session(): void

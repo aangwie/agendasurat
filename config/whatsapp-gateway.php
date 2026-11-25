@@ -67,4 +67,45 @@ return [
 
     'notify_timeout' => (int) env('WHATSAPP_GATEWAY_NOTIFY_TIMEOUT', 5),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Lampiran (Media)
+    |--------------------------------------------------------------------------
+    |
+    | Gateway menyediakan POST /send-media dengan body JSON berisi device_id,
+    | recipient, type (image|video|audio), caption, serta salah satu dari url
+    | atau file_path. Lampiran disimpan pada disk publik agar gateway dapat
+    | mengunduhnya lewat URL; "file_path" hanya terpakai bila gateway berada
+    | pada server yang sama dengan aplikasi.
+    |
+    | Gateway belum mendukung type "document", sehingga PDF dikirim sebagai
+    | pesan teks berisi tautan unduhan (document_link_fallback).
+    |
+    */
+
+    'media_path' => env('WHATSAPP_GATEWAY_MEDIA_PATH', '/send-media'),
+
+    'media_disk' => env('WHATSAPP_GATEWAY_MEDIA_DISK', 'public'),
+
+    'attachment_directory' => env('WHATSAPP_GATEWAY_ATTACHMENT_DIR', 'whatsapp/attachments'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | URL Publik Lampiran (opsional)
+    |--------------------------------------------------------------------------
+    |
+    | Gateway mengunduh lampiran lewat URL, sehingga alamatnya harus dapat
+    | diakses dari internet. Bila APP_URL masih menunjuk localhost (umum pada
+    | pengembangan lokal), isi nilai ini dengan domain publik aplikasi, mis.
+    | https://agenda.domain.go.id — URL lampiran menjadi:
+    | {nilai ini}/storage/whatsapp/attachments/xxxx.png
+    |
+    */
+
+    'attachment_public_url' => env('WHATSAPP_GATEWAY_PUBLIC_URL'),
+
+    'document_link_fallback' => (bool) env('WHATSAPP_GATEWAY_DOCUMENT_LINK_FALLBACK', true),
+
+    'attachment_max_kb' => (int) env('WHATSAPP_GATEWAY_ATTACHMENT_MAX_KB', 8192),
+
 ];

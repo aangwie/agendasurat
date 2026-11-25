@@ -361,6 +361,37 @@ penyebabnya secara spesifik:
 Untuk lingkungan pengujian, set `DEPLOY_COMMANDS_ENABLED=false` agar perintah git/artisan
 tidak dieksekusi (sudah diatur pada `phpunit.xml`).
 
+## Uji Pesan WhatsApp & Lampiran
+
+Menu **Whatsapp Gateway** (khusus administrator) menyediakan halaman **Uji Pesan**
+di `/whatsapp-gateway/uji-pesan` untuk memastikan perangkat sudah tertaut dan pesan
+terkirim dengan benar.
+
+- **Lampiran opsional** — PDF, JPG, JPEG, PNG, atau WEBP (maksimal 8 MB, dapat
+  diubah lewat `WHATSAPP_GATEWAY_ATTACHMENT_MAX_KB`). Isi pesan boleh dikosongkan
+  bila hanya mengirim lampiran; bila pesan diisi, teks tersebut menjadi *caption*.
+- Lampiran disimpan pada disk publik (`storage/app/public/whatsapp/attachments`)
+  lalu diteruskan ke gateway sebagai **JSON** ke `WHATSAPP_GATEWAY_MEDIA_PATH`
+  (default `POST /send-media`) dengan field `device_id`, `recipient`,
+  `type` (`image`), `url`, `file_path`, dan `caption`.
+- **URL lampiran harus dapat diakses dari internet.** Gateway mengunduh berkas
+  dari `url`, jadi bila `APP_URL` masih `http://localhost`, gateway akan gagal
+  dengan pesan *"Request failed with status code 404"*. Solusi: set `APP_URL`
+  ke domain publik **atau** isi `WHATSAPP_GATEWAY_PUBLIC_URL`
+  (mis. `https://agenda.domain.go.id`), lalu jalankan `php artisan storage:link`.
+  Aplikasi menolak pengiriman lebih awal (dengan pesan jelas) bila URL masih
+  mengarah ke localhost/IP privat, dan menampilkan peringatan pada halaman uji.
+- `file_path` hanya terpakai bila gateway berada pada server yang sama dengan
+  aplikasi (mis. gateway lokal saat pengembangan).
+- Gateway Billnesia hanya mendukung `type` **image/video/audio**. Untuk PDF,
+  aplikasi otomatis mengirim pesan teks berisi tautan unduhan melalui
+  `POST /send` (dapat dimatikan lewat
+  `WHATSAPP_GATEWAY_DOCUMENT_LINK_FALLBACK=false`).
+- Pratinjau berkas (thumbnail untuk gambar, nama & ukuran untuk PDF) tampil sebelum
+  pengiriman, dan riwayat pengujian mencatat nama lampiran.
+- Lampiran uji yang lebih lama dari 24 jam dibersihkan otomatis pada pengiriman
+  berikutnya.
+
 ## Aturan pengembangan
 
 - **Dilarang menghapus isi database** (users, profil instansi, surat masuk/keluar, klasifikasi)

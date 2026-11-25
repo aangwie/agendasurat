@@ -2,6 +2,7 @@
     <div class="space-y-6" data-whatsapp-test
         data-send-url="{{ route('whatsapp.test.send') }}"
         data-status-url="{{ route('whatsapp.status') }}"
+        data-max-attachment-kb="{{ $maxAttachmentKb }}"
         data-session-phone="{{ $session['phone_number'] }}">
 
         {{-- Ringkasan --}}
@@ -68,7 +69,14 @@
                     </div>
                 </div>
 
-                <form data-wa-test-form class="mt-5 space-y-4">
+                <form data-wa-test-form enctype="multipart/form-data" class="mt-5 space-y-4">
+                    @if ($attachmentWarning)
+                        <div class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800"
+                            role="alert">
+                            <x-icon name="shield-check" class="mt-0.5 size-4 shrink-0 text-amber-500" />
+                            <p>{{ $attachmentWarning }}</p>
+                        </div>
+                    @endif
                     <div>
                         <label for="recipient" class="form-label">
                             <x-icon name="at-symbol" class="size-4 text-zinc-400" />
@@ -108,10 +116,58 @@
                             <span data-wa-counter class="text-[11px] font-medium text-zinc-400">0 / 4096</span>
                         </div>
 
-                        <textarea id="message" name="message" rows="6" maxlength="4096" required
+                        <textarea id="message" name="message" rows="6" maxlength="4096"
                             placeholder="Tulis pesan uji di sini..." class="form-input resize-y">{{ old('message', 'Uji coba pengiriman pesan dari Agenda Surat.') }}</textarea>
 
                         @error('message')
+                            <p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Lampiran opsional (PDF / gambar) --}}
+                    <div>
+                        <div class="flex items-center justify-between gap-3">
+                            <label for="attachment" class="form-label">
+                                <x-icon name="paper-clip" class="size-4 text-zinc-400" />
+                                Lampiran
+                            </label>
+
+                            <span class="text-[11px] font-medium text-zinc-400">Opsional</span>
+                        </div>
+
+                        <input id="attachment" name="attachment" type="file" data-wa-attachment
+                            accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                            class="form-input py-2.5 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white">
+
+                        <p class="mt-1.5 text-[11px] text-zinc-400">
+                            Gambar (JPG, PNG, WEBP) dikirim langsung, maksimal {{ intdiv($maxAttachmentKb, 1024) }} MB.
+                            PDF dikirim sebagai tautan unduhan karena gateway hanya mendukung gambar/video/audio.
+                            Isi pesan boleh dikosongkan bila hanya mengirim lampiran.
+                        </p>
+
+                        <div data-wa-attachment-preview
+                            class="mt-2 hidden items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                            <img data-wa-attachment-thumb alt="Pratinjau lampiran"
+                                class="hidden size-10 shrink-0 rounded-lg object-cover ring-1 ring-zinc-200">
+
+                            <span data-wa-attachment-icon
+                                class="grid size-10 shrink-0 place-items-center rounded-lg bg-white text-zinc-500 ring-1 ring-zinc-200">
+                                <x-icon name="document-text" class="size-5" />
+                            </span>
+
+                            <span class="min-w-0 flex-1">
+                                <span data-wa-attachment-name
+                                    class="block truncate text-xs font-semibold text-zinc-700"></span>
+                                <span data-wa-attachment-meta class="block text-[11px] text-zinc-400"></span>
+                            </span>
+
+                            <button type="button" data-wa-attachment-clear class="btn btn-ghost px-2 py-1.5"
+                                aria-label="Hapus lampiran" title="Hapus lampiran">
+                                <x-icon name="x-mark" class="size-4" />
+                            </button>
+                        </div>
+
+                        @error('attachment')
                             <p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
