@@ -115,6 +115,62 @@ class UserManagementTest extends TestCase
         $this->assertSame('408.37.02', $user->fresh()->kode_bidang);
     }
 
+    public function test_the_alias_is_optional_and_falls_back_to_the_full_name(): void
+    {
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/pengguna', $this->payload(['alias' => '']))
+            ->assertRedirect(route('pengguna.index'));
+
+        $user = User::query()->where('email', 'dikdas@instansi.go.id')->first();
+
+        $this->assertNotNull($user);
+        $this->assertNull($user->alias);
+        $this->assertSame('Bidang Pendidikan Dasar', $user->bidangLabel());
+    }
+
+    public function test_an_alias_can_be_created_updated_and_shown_on_the_table(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->post('/pengguna', $this->payload([
+                'name' => 'Bidang Pendidik dan Tenaga Kependidikan (PTK)',
+                'alias' => 'PTK',
+            ]))
+            ->assertRedirect(route('pengguna.index'));
+
+        $user = User::query()->where('email', 'dikdas@instansi.go.id')->firstOrFail();
+
+        $this->assertSame('PTK', $user->alias);
+        $this->assertSame('PTK', $user->bidangLabel());
+
+        $this->actingAs($admin)
+            ->put("/pengguna/{$user->id}", $this->payload([
+                'name' => 'Bidang Pendidik dan Tenaga Kependidikan (PTK)',
+                'alias' => 'PTK Baru',
+                'email' => $user->email,
+                'password' => '',
+                'password_confirmation' => '',
+            ]))
+            ->assertRedirect(route('pengguna.index'));
+
+        $this->assertSame('PTK Baru', $user->fresh()->alias);
+
+        $this->actingAs($admin)
+            ->get('/pengguna')
+            ->assertOk()
+            ->assertSee('Alias')
+            ->assertSee('PTK Baru')
+            ->assertSee('data-user-alias', escape: false);
+    }
+
+    public function test_the_alias_is_limited_to_thirty_characters(): void
+    {
+        $this->actingAs(User::factory()->admin()->create())
+            ->post('/pengguna', $this->payload(['alias' => str_repeat('A', 31)]))
+            ->assertSessionHasErrors('alias');
+    }
+
     public function test_creating_requires_all_fields(): void
     {
         $this->actingAs(User::factory()->admin()->create())

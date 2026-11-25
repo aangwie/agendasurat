@@ -28,7 +28,7 @@
                 <input type="hidden" name="_method" value="" data-method-input disabled>
 
                 <div class="space-y-4 px-5 py-5 sm:px-6">
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
                         <div class="sm:col-span-2">
                             <x-input-field name="name" label="Nama Bidang" icon="building-office"
                                 placeholder="Contoh: Bidang Pendidikan Dasar" maxlength="150" />
@@ -37,6 +37,10 @@
                         <x-input-field name="kode_bidang" label="Kode Bidang" icon="key"
                             placeholder="408.37.06" maxlength="30" :required="false"
                             hint="Kode register bidang, boleh dikosongkan." />
+
+                        <x-input-field name="alias" label="Alias" icon="sparkles"
+                            placeholder="PTK" maxlength="30" :required="false"
+                            hint="Nama singkat untuk tabel." />
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

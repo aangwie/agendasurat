@@ -90,6 +90,14 @@
                         @else
                             <span class="text-xs text-zinc-300">—</span>
                         @endif
+
+                        @if (filled($user->alias))
+                            <span data-user-alias
+                                class="ml-1 inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-[12px] font-semibold text-rose-700 ring-1 ring-rose-100"
+                                title="Alias bidang: {{ $user->alias }}">
+                                {{ $user->alias }}
+                            </span>
+                        @endif
                     </td>
 
                     <td class="px-4 py-3 align-top">

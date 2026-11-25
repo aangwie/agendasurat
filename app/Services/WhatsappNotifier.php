@@ -138,6 +138,8 @@ class WhatsappNotifier
                 return [
                     'kode_bidang' => (string) $kodeBidang,
                     'name' => (string) $user->name,
+                    'alias' => $user->alias,
+                    'label' => $user->bidangLabel(),
                     'user' => $user,
                     'phone' => filled($user->phone) ? $this->gateway->normalizePhone((string) $user->phone) : null,
                 ];

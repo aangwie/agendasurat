@@ -17,6 +17,9 @@ const STATUS_LABELS = {
     skipped: 'Dilewati',
 };
 
+const SHARE_ICON =
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="size-3 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>';
+
 const escapeHtml = (value) =>
     String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -60,6 +63,7 @@ export function initIncomingLetterDisposition() {
 
     let sendUrl = '';
     let lastFocused = null;
+    let activeButton = null;
     let bidangs = [];
 
     const setText = (element, value) => {
@@ -141,22 +145,28 @@ export function initIncomingLetterDisposition() {
                     ? `<span class="font-mono">+${escapeHtml(bidang.phone)}</span>`
                     : '<span class="text-amber-600">Tanpa nomor WhatsApp</span>';
 
+                const primary = bidang.alias || bidang.name;
+                const secondaryName = bidang.alias
+                    ? `<span class="truncate">${escapeHtml(bidang.name)}</span>`
+                    : '';
+
                 return `<label class="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 transition hover:border-zinc-300 hover:bg-zinc-50 has-checked:border-rose-400 has-checked:bg-rose-50/60 ${
                     disabled ? 'cursor-not-allowed opacity-60' : ''
-                }">
+                }" title="${escapeHtml(bidang.name)}">
                     <input type="checkbox" name="bidangs[]" value="${escapeHtml(bidang.kode_bidang)}"
                         data-disposisi-checkbox data-index="${index}" ${disabled ? 'disabled' : ''}
                         class="mt-0.5 size-4 shrink-0 rounded border-zinc-300 accent-rose-600">
 
                     <span class="min-w-0 flex-1">
                         <span class="block truncate text-xs font-semibold text-zinc-800">
-                            ${escapeHtml(bidang.name)}
+                            ${escapeHtml(primary)}
                         </span>
                         <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-400">
                             <span class="font-mono">${escapeHtml(bidang.kode_bidang)}</span>
                             <span aria-hidden="true">&middot;</span>
                             ${phone}
                             ${status}
+                            ${secondaryName}
                         </span>
                     </span>
                 </label>`;
@@ -164,6 +174,36 @@ export function initIncomingLetterDisposition() {
             .join('');
 
         updateCount();
+    };
+
+    /**
+     * Perbarui badge tujuan disposisi di bawah nomor surat pada baris tabel.
+     */
+    const renderTableBadges = () => {
+        const cell = activeButton?.closest('[data-letter-dispositions-cell]');
+        const container = cell?.querySelector('[data-letter-dispositions]');
+
+        if (!container) {
+            return;
+        }
+
+        const rows = bidangs.filter((bidang) => bidang.last_status);
+
+        container.innerHTML = rows
+            .map((bidang) => {
+                const label = bidang.last_status_label ?? STATUS_LABELS[bidang.last_status] ?? '';
+                const primary = bidang.alias || bidang.name;
+
+                return `<span data-disposition-bidang="${escapeHtml(bidang.kode_bidang)}"
+                    title="Disposisi: ${escapeHtml(bidang.name)} — ${escapeHtml(label)} (${escapeHtml(bidang.kode_bidang)})"
+                    class="badge max-w-[10rem] ${STATUS_STYLES[bidang.last_status] ?? 'bg-zinc-100 text-zinc-600'}">
+                    ${SHARE_ICON}
+                    <span class="truncate">${escapeHtml(primary)}</span>
+                </span>`;
+            })
+            .join('');
+
+        container.classList.toggle('hidden', rows.length === 0);
     };
 
     const renderLetter = (data) => {
@@ -261,6 +301,7 @@ export function initIncomingLetterDisposition() {
         const url = button.dataset.disposisiUrl;
 
         if (url) {
+            activeButton = button;
             load(url);
         }
     });
@@ -393,6 +434,7 @@ export function initIncomingLetterDisposition() {
             );
 
             renderBidangs();
+            renderTableBadges();
         } catch (error) {
             setResult('error', 'Disposisi gagal dikirim', [
                 { name: error.message, status: 'failed', label: 'Gagal' },

@@ -236,6 +236,19 @@ Tombol **disposisi** pada kolom aksi membuka popup berisi:
   dulu). Bidang tanpa nomor WhatsApp ditandai dan tidak dapat dicentang;
 - status disposisi terakhir per bidang (Terkirim / Gagal / Dilewati).
 
+Tujuan disposisi juga ditampilkan pada **tabel surat masuk**, tepat di bawah
+**nomor surat**: satu badge per bidang, dengan warna sesuai status terakhir
+(hijau = terkirim, merah = gagal, kuning = dilewati) dan tooltip berisi nama
+lengkap bidang, status, serta kode bidang. Badge ikut diperbarui segera setelah
+disposisi dikirim tanpa perlu memuat ulang halaman.
+
+**Alias bidang** (menu **Pengguna** → isian **Alias**) dipakai sebagai teks
+badge agar ringkas. Contoh: nama bidang
+*Bidang Pendidik dan Tenaga Kependidikan (PTK)* diberi alias **PTK**, sehingga
+tabel surat masuk menampilkan badge **PTK** (nama lengkap tetap ada pada
+tooltip). Bila alias dikosongkan, nama bidang lengkap yang ditampilkan. Alias
+juga tampil sebagai chip di samping kode bidang pada tabel pengguna.
+
 Saat **Kirim Disposisi** ditekan, setiap bidang yang dicentang menerima pesan
 WhatsApp berisi ringkasan surat, sifat, nama pendisposisi, dan **tautan unduhan
 surat** (lampiran bila ada, jika tidak halaman cetak). Hasil tiap bidang

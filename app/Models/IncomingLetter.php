@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -91,6 +92,20 @@ class IncomingLetter extends Model
     public function dispositions(): HasMany
     {
         return $this->hasMany(LetterDisposition::class);
+    }
+
+    /**
+     * Disposisi terakhir untuk setiap bidang (satu baris per bidang).
+     *
+     * @return Collection<int, LetterDisposition>
+     */
+    public function latestDispositions(): Collection
+    {
+        return $this->dispositions
+            ->sortByDesc('id')
+            ->unique('kode_bidang')
+            ->sortBy('kode_bidang')
+            ->values();
     }
 
     /**

@@ -29,6 +29,7 @@ class UserRequest extends FormRequest
 
         $this->merge([
             'name' => trim((string) $this->input('name')),
+            'alias' => trim((string) $this->input('alias')) ?: null,
             'kode_bidang' => trim((string) $this->input('kode_bidang')) ?: null,
             'email' => mb_strtolower(trim((string) $this->input('email'))),
             'phone' => $phone === '' ? null : $phone,
@@ -47,6 +48,7 @@ class UserRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:150'],
+            'alias' => ['nullable', 'string', 'max:30'],
             'kode_bidang' => [
                 'nullable',
                 'string',
@@ -97,6 +99,7 @@ class UserRequest extends FormRequest
         return [
             'name.required' => 'Nama bidang wajib diisi.',
             'name.max' => 'Nama bidang maksimal 150 karakter.',
+            'alias.max' => 'Alias maksimal 30 karakter.',
             'kode_bidang.max' => 'Kode bidang maksimal 30 karakter.',
             'kode_bidang.regex' => 'Kode bidang tidak valid. Contoh: 408.37.06.',
             'kode_bidang.unique' => 'Kode bidang tersebut sudah dipakai pengguna lain.',
@@ -119,6 +122,7 @@ class UserRequest extends FormRequest
     {
         return [
             'name' => 'nama bidang',
+            'alias' => 'alias',
             'kode_bidang' => 'kode bidang',
             'email' => 'email',
             'phone' => 'no hp',

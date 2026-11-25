@@ -22,6 +22,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'alias',
         'kode_bidang',
         'email',
         'password',
@@ -59,6 +60,16 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return (bool) $this->is_admin;
+    }
+
+    /**
+     * Label ringkas bidang: alias bila diisi, jika tidak nama lengkap.
+     */
+    public function bidangLabel(): string
+    {
+        $alias = trim((string) ($this->alias ?? ''));
+
+        return $alias !== '' ? $alias : (string) $this->name;
     }
 
     /**

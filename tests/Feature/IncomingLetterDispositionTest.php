@@ -75,6 +75,7 @@ class IncomingLetterDispositionTest extends TestCase
 
         User::factory()->create([
             'name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'alias' => 'SD',
             'kode_bidang' => '408.37.03',
             'phone' => '6283333333333',
         ]);
@@ -112,6 +113,7 @@ class IncomingLetterDispositionTest extends TestCase
 
         $this->assertTrue($bidangs->contains(fn (array $row): bool => $row['kode_bidang'] === '408.37.03'
             && $row['can_receive'] === true
+            && $row['alias'] === 'SD'
             && $row['phone'] === '6283333333333'));
 
         $this->assertTrue($bidangs->contains(fn (array $row): bool => $row['kode_bidang'] === '408.37.02'
@@ -232,6 +234,85 @@ class IncomingLetterDispositionTest extends TestCase
             ->postJson(route('surat-masuk.disposisi.kirim', $letter), ['bidangs' => []])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['bidangs']);
+    }
+
+    public function test_the_letter_table_shows_the_disposition_targets_under_the_letter_number(): void
+    {
+        $manager = $this->manager();
+        $letter = IncomingLetter::create($this->payload());
+
+        // Riwayat lama (gagal) lalu terkirim: yang ditampilkan adalah status terbaru.
+        LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.03',
+            'bidang_name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'status' => LetterDisposition::STATUS_FAILED,
+        ]);
+
+        LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.03',
+            'bidang_name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'status' => LetterDisposition::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.05',
+            'bidang_name' => 'Bidang Pembinaan PAUD dan PNF',
+            'status' => LetterDisposition::STATUS_SKIPPED,
+        ]);
+
+        $response = $this->actingAs($manager)->get('/surat-masuk')->assertOk();
+
+        $html = $response->getContent();
+
+        // Badge tujuan disposisi berada pada sel nomor surat.
+        $this->assertStringContainsString('data-letter-dispositions-cell', $html);
+        $this->assertStringContainsString('data-letter-dispositions', $html);
+        $this->assertStringContainsString('data-disposition-bidang="408.37.03"', $html);
+        $this->assertStringContainsString('data-disposition-bidang="408.37.05"', $html);
+        $this->assertStringContainsString('Bidang Pembinaan Sekolah Dasar (SD)', $html);
+        $this->assertStringContainsString('Bidang Pembinaan PAUD dan PNF', $html);
+
+        // Status terbaru yang dipakai (bukan riwayat gagal sebelumnya).
+        $this->assertStringContainsString('Disposisi: Bidang Pembinaan Sekolah Dasar (SD) — Terkirim', $html);
+
+        // Parsial AJAX juga memuat badge yang sama.
+        $ajax = $this->actingAs($manager)
+            ->get('/surat-masuk', ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk();
+
+        $this->assertStringContainsString('data-disposition-bidang="408.37.03"', $ajax->getContent());
+    }
+
+    public function test_the_letter_table_prefers_the_bidang_alias_over_the_full_name(): void
+    {
+        $manager = $this->manager();
+
+        $bidang = User::factory()->create([
+            'name' => 'Bidang Pendidik dan Tenaga Kependidikan (PTK)',
+            'alias' => 'PTK',
+            'kode_bidang' => '408.37.06',
+            'phone' => '6286666666666',
+        ]);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        LetterDisposition::create([
+            'incoming_letter_id' => $letter->id,
+            'kode_bidang' => '408.37.06',
+            'bidang_name' => $bidang->name,
+            'user_id' => $bidang->id,
+            'status' => LetterDisposition::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        $html = $this->actingAs($manager)->get('/surat-masuk')->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-disposition-bidang="408.37.06"', $html);
+        $this->assertStringContainsString('<span class="truncate">PTK</span>', $html);
     }
 
     public function test_the_letter_page_shows_the_disposition_action_and_modal(): void

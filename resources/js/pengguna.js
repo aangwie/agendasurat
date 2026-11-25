@@ -30,6 +30,7 @@ export function initUserManagement() {
 
     const fields = {
         name: form.querySelector('[name="name"]'),
+        alias: form.querySelector('[name="alias"]'),
         kode_bidang: form.querySelector('[name="kode_bidang"]'),
         email: form.querySelector('[name="email"]'),
         phone: form.querySelector('[name="phone"]'),

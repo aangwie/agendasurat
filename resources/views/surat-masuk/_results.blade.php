@@ -70,8 +70,33 @@
                         {{ $letter->letter_date?->locale('id')->translatedFormat('j F Y') }}
                     </td>
 
-                    <td class="px-4 py-3 align-top">
+                    <td class="px-4 py-3 align-top" data-letter-dispositions-cell>
                         <span class="font-mono text-[12px] text-zinc-600">{{ $letter->letter_number }}</span>
+
+                        @php
+                            $tujuanDisposisi = $letter->latestDispositions();
+                            $statusStyles = [
+                                'sent' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+                                'failed' => 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+                                'skipped' => 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+                            ];
+                        @endphp
+
+                        <div data-letter-dispositions
+                            class="mt-1.5 flex flex-wrap items-center gap-1 {{ $tujuanDisposisi->isEmpty() ? 'hidden' : '' }}">
+                            @foreach ($tujuanDisposisi as $disposisi)
+                                @php
+                                    $labelBidang = $disposisi->user?->bidangLabel() ?: $disposisi->bidang_name;
+                                @endphp
+
+                                <span data-disposition-bidang="{{ $disposisi->kode_bidang }}"
+                                    title="Disposisi: {{ $disposisi->bidang_name }} — {{ $disposisi->statusLabel() }} ({{ $disposisi->kode_bidang }})"
+                                    class="badge max-w-[10rem] {{ $statusStyles[$disposisi->status] ?? 'bg-zinc-100 text-zinc-600' }}">
+                                    <x-icon name="share" class="size-3 shrink-0" />
+                                    <span class="truncate">{{ $labelBidang }}</span>
+                                </span>
+                            @endforeach
+                        </div>
                     </td>
 
                     <td class="px-4 py-3 align-top">

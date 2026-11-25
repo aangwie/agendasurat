@@ -73,6 +73,7 @@ class UserController extends Controller
     {
         $user = User::create([
             'name' => $request->validated('name'),
+            'alias' => $request->validated('alias'),
             'kode_bidang' => $request->validated('kode_bidang'),
             'email' => $request->validated('email'),
             'phone' => $request->validated('phone'),
@@ -110,6 +111,7 @@ class UserController extends Controller
 
         $data = [
             'name' => $request->validated('name'),
+            'alias' => $request->validated('alias'),
             'kode_bidang' => $request->validated('kode_bidang'),
             'email' => $request->validated('email'),
             'phone' => $request->validated('phone'),

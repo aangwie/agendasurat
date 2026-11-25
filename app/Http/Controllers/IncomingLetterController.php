@@ -41,6 +41,7 @@ class IncomingLetterController extends Controller
         }
 
         $letters = IncomingLetter::query()
+            ->with('dispositions.user')
             ->search($search)
             ->orderByDesc('received_date')
             ->orderByDesc('id')
@@ -168,6 +169,8 @@ class IncomingLetterController extends Controller
                 return [
                     'kode_bidang' => $recipient['kode_bidang'],
                     'name' => $recipient['name'],
+                    'alias' => $recipient['alias'] ?? null,
+                    'label' => $recipient['label'] ?? $recipient['name'],
                     'phone' => $recipient['phone'],
                     'can_receive' => $recipient['phone'] !== null,
                     'last_status' => $last?->status,
