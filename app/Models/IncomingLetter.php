@@ -129,6 +129,39 @@ class IncomingLetter extends Model
     }
 
     /**
+     * MIME type berkas lampiran (null bila berkas tidak tersedia).
+     */
+    public function attachmentMimeType(): ?string
+    {
+        if (! $this->hasAttachment()) {
+            return null;
+        }
+
+        $disk = Storage::disk(self::ATTACHMENT_DISK);
+        $path = (string) $this->attachment_path;
+
+        return $disk->exists($path) ? $disk->mimeType($path) : null;
+    }
+
+    /**
+     * Jenis pratinjau lampiran: "image" (tampil sebagai gambar), "pdf"
+     * (tampil lewat iframe), atau "other" (hanya tautan unduh).
+     */
+    public function attachmentPreviewKind(): string
+    {
+        $mime = (string) $this->attachmentMimeType();
+        $extension = strtolower(pathinfo($this->attachmentLabel(), PATHINFO_EXTENSION));
+
+        return match (true) {
+            str_starts_with($mime, 'image/') => 'image',
+            $mime === 'application/pdf' => 'pdf',
+            in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true) => 'image',
+            $extension === 'pdf' => 'pdf',
+            default => 'other',
+        };
+    }
+
+    /**
      * Hapus berkas lampiran dari disk (dipanggil sebelum menimpa/menghapus surat).
      */
     public function deleteAttachment(): void

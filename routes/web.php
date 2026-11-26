@@ -30,6 +30,13 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
 });
 
+// Tautan lampiran untuk penerima disposisi WhatsApp: dapat dibuka tanpa login.
+// Tanda tangan URL (signed:relative) membuat tautan hanya sah bila dibuat aplikasi,
+// dan tetap berlaku walau domain publik berbeda dari APP_URL.
+Route::get('surat-masuk/{incomingLetter}/lampiran-umum', [IncomingLetterController::class, 'publicAttachment'])
+    ->middleware('signed:relative')
+    ->name('surat-masuk.lampiran.umum');
+
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
@@ -71,6 +78,8 @@ Route::middleware('auth')->group(function () {
     Route::get('surat-masuk/{incomingLetter}/cetak', [IncomingLetterController::class, 'print'])->name('surat-masuk.cetak');
     Route::get('surat-masuk/{incomingLetter}/lampiran', [IncomingLetterController::class, 'attachment'])
         ->name('surat-masuk.lampiran');
+    Route::get('surat-masuk/{incomingLetter}/lampiran/pratinjau', [IncomingLetterController::class, 'previewAttachment'])
+        ->name('surat-masuk.lampiran.pratinjau');
 
     // Pencatatan surat masuk hanya untuk Subbag Umum & Kepegawaian dan admin.
     Route::middleware('surat-masuk.manage')->group(function () {

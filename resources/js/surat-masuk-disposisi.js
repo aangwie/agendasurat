@@ -55,6 +55,11 @@ export function initIncomingLetterDisposition() {
     const attachmentInput = modal.querySelector('[data-disposisi-attachment-input]');
     const attachmentUploadButton = modal.querySelector('[data-disposisi-attachment-upload]');
     const attachmentDeleteButton = modal.querySelector('[data-disposisi-attachment-delete]');
+    const attachmentPreview = modal.querySelector('[data-disposisi-attachment-preview]');
+    const attachmentPreviewImage = modal.querySelector('[data-disposisi-attachment-image]');
+    const attachmentPreviewFrame = modal.querySelector('[data-disposisi-attachment-frame]');
+    const attachmentPreviewFallback = modal.querySelector('[data-disposisi-attachment-fallback]');
+    const attachmentPreviewOpen = modal.querySelector('[data-disposisi-attachment-open]');
     const subtitle = modal.querySelector('[data-disposisi-subtitle]');
     const cancelSection = modal.querySelector('[data-disposisi-cancel-section]');
     const cancelList = modal.querySelector('[data-disposisi-cancel-list]');
@@ -77,6 +82,7 @@ export function initIncomingLetterDisposition() {
     let cancelUrl = '';
     let attachmentUploadUrl = '';
     let attachmentDeleteUrl = '';
+    let localPreviewUrl = null;
     let lastFocused = null;
     let activeButton = null;
     let bidangs = [];
@@ -291,7 +297,89 @@ export function initIncomingLetterDisposition() {
     };
 
     /**
-     * Tampilkan status lampiran surat (nama, tautan unduh, tombol hapus).
+     * Tampilkan pratinjau lampiran (gambar langsung, PDF lewat iframe).
+     *
+     * `kind` bernilai "image", "pdf", atau "other". Untuk jenis lain hanya
+     * pesan bantuan yang ditampilkan karena browser tidak dapat mempratinjaunya.
+     */
+    const showAttachmentPreview = (url, kind) => {
+        if (!attachmentPreview) {
+            return;
+        }
+
+        const isImage = kind === 'image' && url !== '';
+        const isPdf = kind === 'pdf' && url !== '';
+
+        attachmentPreview.classList.remove('hidden');
+
+        if (attachmentPreviewImage) {
+            attachmentPreviewImage.classList.toggle('hidden', !isImage);
+
+            if (isImage) {
+                attachmentPreviewImage.src = url;
+            } else {
+                attachmentPreviewImage.removeAttribute('src');
+            }
+        }
+
+        if (attachmentPreviewFrame) {
+            attachmentPreviewFrame.classList.toggle('hidden', !isPdf);
+
+            if (isPdf) {
+                attachmentPreviewFrame.src = url;
+            } else {
+                attachmentPreviewFrame.removeAttribute('src');
+            }
+        }
+
+        attachmentPreviewFallback?.classList.toggle('hidden', isImage || isPdf);
+
+        if (attachmentPreviewOpen) {
+            attachmentPreviewOpen.classList.toggle('hidden', url === '');
+            attachmentPreviewOpen.href = url !== '' ? url : '#';
+        }
+    };
+
+    /**
+     * Sembunyikan pratinjau lampiran dan bersihkan sumbernya.
+     */
+    const hideAttachmentPreview = () => {
+        attachmentPreview?.classList.add('hidden');
+        attachmentPreviewImage?.classList.add('hidden');
+        attachmentPreviewImage?.removeAttribute('src');
+        attachmentPreviewFrame?.classList.add('hidden');
+        attachmentPreviewFrame?.removeAttribute('src');
+        attachmentPreviewFallback?.classList.add('hidden');
+
+        if (attachmentPreviewOpen) {
+            attachmentPreviewOpen.classList.add('hidden');
+            attachmentPreviewOpen.href = '#';
+        }
+    };
+
+    /**
+     * Lepaskan object URL pratinjau lokal agar memori browser tidak menumpuk.
+     */
+    const clearLocalPreview = () => {
+        if (localPreviewUrl !== null) {
+            URL.revokeObjectURL(localPreviewUrl);
+            localPreviewUrl = null;
+        }
+    };
+
+    /**
+     * Tentukan jenis pratinjau dari MIME type berkas yang dipilih.
+     */
+    const filePreviewKind = (file) => {
+        if (file.type.startsWith('image/')) {
+            return 'image';
+        }
+
+        return file.type === 'application/pdf' ? 'pdf' : 'other';
+    };
+
+    /**
+     * Tampilkan status lampiran surat (nama, tautan unduh, tombol hapus, pratinjau).
      */
     const renderAttachment = (attachment = {}) => {
         const available = attachment.available === true;
@@ -317,6 +405,12 @@ export function initIncomingLetterDisposition() {
             attachmentMeta.textContent = available
                 ? 'Lampiran siap diunduh penerima disposisi.'
                 : 'Unggah lampiran di bawah ini agar penerima disposisi dapat mengunduhnya.';
+        }
+
+        if (available) {
+            showAttachmentPreview(attachment.preview_url ?? '', attachment.kind ?? 'other');
+        } else {
+            hideAttachmentPreview();
         }
     };
 
@@ -358,6 +452,8 @@ export function initIncomingLetterDisposition() {
         attachmentUploadUrl = '';
         attachmentDeleteUrl = '';
         hideResult();
+        clearLocalPreview();
+        hideAttachmentPreview();
 
         if (attachmentInput) {
             attachmentInput.value = '';
@@ -609,6 +705,7 @@ export function initIncomingLetterDisposition() {
             }
 
             renderAttachment(payload.attachment ?? {});
+            clearLocalPreview();
 
             if (attachmentInput) {
                 attachmentInput.value = '';
@@ -663,6 +760,32 @@ export function initIncomingLetterDisposition() {
             ]);
         }
     };
+
+    /**
+     * Pratinjau langsung berkas yang baru dipilih, sebelum diunggah.
+     */
+    attachmentInput?.addEventListener('change', () => {
+        clearLocalPreview();
+
+        const file = attachmentInput.files?.[0] ?? null;
+
+        if (!file) {
+            hideAttachmentPreview();
+
+            return;
+        }
+
+        const kind = filePreviewKind(file);
+
+        if (kind === 'other') {
+            showAttachmentPreview('', 'other');
+
+            return;
+        }
+
+        localPreviewUrl = URL.createObjectURL(file);
+        showAttachmentPreview(localPreviewUrl, kind);
+    });
 
     attachmentUploadButton?.addEventListener('click', uploadAttachment);
     attachmentDeleteButton?.addEventListener('click', deleteAttachment);

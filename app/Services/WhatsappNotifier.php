@@ -8,6 +8,7 @@ use App\Models\TaskLetter;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Throwable;
 
 /**
@@ -320,24 +321,34 @@ class WhatsappNotifier
     /**
      * Tautan publik surat (lampiran bila ada, jika tidak halaman cetak).
      *
-     * Nilai WHATSAPP_GATEWAY_PUBLIC_URL dipakai lebih dulu agar tautan tetap
-     * dapat dibuka penerima ketika APP_URL masih menunjuk localhost.
+     * Lampiran dibuka lewat tautan bertanda tangan sehingga penerima disposisi
+     * dapat membukanya tanpa login. Tanda tangan dihitung dari URL relatif
+     * (middleware `signed:relative`), sehingga domain publik pada
+     * WHATSAPP_GATEWAY_PUBLIC_URL tetap dapat dipakai walau APP_URL menunjuk
+     * localhost.
      */
     public function publicUrl(IncomingLetter $letter): string
     {
-        $route = $letter->hasAttachment() ? 'surat-masuk.lampiran' : 'surat-masuk.cetak';
-        $url = route($route, ['incomingLetter' => $letter]);
-
-        $override = trim((string) config('whatsapp-gateway.attachment_public_url', ''));
-
-        if ($override === '') {
-            return $url;
+        if ($letter->hasAttachment()) {
+            return $this->publicBaseUrl().URL::signedRoute(
+                'surat-masuk.lampiran.umum',
+                ['incomingLetter' => $letter],
+                null,
+                false,
+            );
         }
 
-        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
-        $query = parse_url($url, PHP_URL_QUERY);
+        return $this->publicBaseUrl().route('surat-masuk.cetak', ['incomingLetter' => $letter], false);
+    }
 
-        return rtrim($override, '/').$path.($query ? '?'.$query : '');
+    /**
+     * Basis URL publik aplikasi (WHATSAPP_GATEWAY_PUBLIC_URL bila diisi).
+     */
+    private function publicBaseUrl(): string
+    {
+        $override = trim((string) config('whatsapp-gateway.attachment_public_url', ''));
+
+        return rtrim($override !== '' ? $override : (string) config('app.url'), '/');
     }
 
     /**

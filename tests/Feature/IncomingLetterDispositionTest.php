@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\IncomingLetter;
 use App\Models\LetterDisposition;
 use App\Models\User;
+use App\Services\WhatsappNotifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
@@ -111,7 +112,10 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertJsonPath('letter.agenda_number', '1701')
             ->assertJsonPath('attachment.available', true)
             ->assertJsonPath('attachment.name', 'surat-edaran.pdf')
-            ->assertJsonStructure(['attachment' => ['upload_url', 'delete_url']]);
+            ->assertJsonPath('attachment.kind', 'pdf')
+            ->assertJsonStructure(['attachment' => ['preview_url', 'upload_url', 'delete_url']]);
+
+        $this->assertNotNull($response->json('attachment.preview_url'));
 
         $bidangs = collect($response->json('bidangs'));
 
@@ -161,6 +165,71 @@ class IncomingLetterDispositionTest extends TestCase
             ->get(route('surat-masuk.lampiran', $letter))
             ->assertOk()
             ->assertDownload('scan-surat.pdf');
+    }
+
+    public function test_the_attachment_is_previewed_inline_for_logged_in_users(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+
+        $manager = $this->manager();
+        $letter = IncomingLetter::create($this->payload());
+
+        $this->actingAs($manager)->post(route('surat-masuk.lampiran.unggah', $letter), [
+            'attachment' => UploadedFile::fake()->create('surat-edaran.pdf', 60, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $response = $this->actingAs($manager)
+            ->get(route('surat-masuk.lampiran.pratinjau', $letter))
+            ->assertOk();
+
+        // Pratinjau ditampilkan di browser (inline), bukan diunduh.
+        $this->assertStringContainsString(
+            'inline',
+            (string) $response->headers->get('content-disposition'),
+        );
+
+        // Lampiran gambar dikenali sebagai pratinjau gambar.
+        $this->actingAs($manager)->post(route('surat-masuk.lampiran.unggah', $letter), [
+            'attachment' => UploadedFile::fake()->create('foto-surat.png', 30, 'image/png'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('attachment.kind', 'image');
+    }
+
+    public function test_the_attachment_public_link_opens_without_login(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        $letter = IncomingLetter::create($this->payload([
+            'attachment_path' => 'incoming-letters/undangan-rapat.pdf',
+            'attachment_name' => 'undangan-rapat.pdf',
+        ]));
+
+        Storage::disk(IncomingLetter::ATTACHMENT_DISK)
+            ->put('incoming-letters/undangan-rapat.pdf', 'contoh isi lampiran');
+
+        $url = app(WhatsappNotifier::class)->publicUrl($letter);
+
+        // Tautan memakai domain publik dan membawa tanda tangan URL.
+        $this->assertStringStartsWith(
+            'https://agenda.example.go.id/surat-masuk/'.$letter->id.'/lampiran-umum?',
+            $url,
+        );
+        $this->assertStringContainsString('signature=', $url);
+
+        // Penerima disposisi dapat membuka lampiran tanpa login.
+        $response = $this->get($url)->assertOk();
+
+        $this->assertStringContainsString(
+            'inline',
+            (string) $response->headers->get('content-disposition'),
+        );
+
+        $this->assertGuest();
+
+        // Tanpa tanda tangan URL, berkas tidak dapat diakses.
+        $this->get(route('surat-masuk.lampiran.umum', $letter))->assertForbidden();
     }
 
     public function test_the_attachment_can_be_replaced_and_removed_from_the_disposition_popup(): void
@@ -272,10 +341,17 @@ class IncomingLetterDispositionTest extends TestCase
                 'skipped' => 1,
             ]);
 
-        // Nomor dinormalisasi (08xx => 62xx) dan pesan memuat tautan unduhan.
+        // Nomor dinormalisasi (08xx => 62xx) dan pesan memuat tautan unduhan
+        // publik bertanda tangan (dapat dibuka penerima tanpa login).
         $letterId = (int) $letter->id;
+        $publicUrl = app(WhatsappNotifier::class)->publicUrl($letter->fresh());
 
-        Http::assertSent(function (Request $request) use ($letterId): bool {
+        $this->assertStringContainsString(
+            'https://agenda.example.go.id/surat-masuk/'.$letterId.'/lampiran-umum?signature=',
+            $publicUrl,
+        );
+
+        Http::assertSent(function (Request $request) use ($publicUrl): bool {
             if ($request->url() !== 'http://gateway.billnesia.com/send') {
                 return false;
             }
@@ -286,8 +362,11 @@ class IncomingLetterDispositionTest extends TestCase
             return in_array($recipient, ['6283333333333', '6281244445555'], true)
                 && str_contains($message, 'Disposisi Surat Masuk')
                 && str_contains($message, '1700')
-                && str_contains($message, 'https://agenda.example.go.id/surat-masuk/'.$letterId.'/lampiran');
+                && str_contains($message, $publicUrl);
         });
+
+        // Tautan pada pesan benar-benar dapat dibuka tanpa login.
+        $this->get($publicUrl)->assertOk();
 
         // Riwayat disposisi tersimpan lengkap dengan status.
         $this->assertDatabaseHas('letter_dispositions', [
@@ -561,6 +640,10 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertSee('data-disposisi-attachment-input', escape: false)
             ->assertSee('data-disposisi-attachment-upload', escape: false)
             ->assertSee('Unggah Lampiran')
+            ->assertSee('data-disposisi-attachment-preview', escape: false)
+            ->assertSee('data-disposisi-attachment-image', escape: false)
+            ->assertSee('data-disposisi-attachment-frame', escape: false)
+            ->assertSee('Pratinjau Lampiran')
             ->assertSee('data-disposisi-cancel-section', escape: false)
             ->assertSee('data-disposisi-cancel-list', escape: false)
             ->assertSee('Batalkan Disposisi yang Salah')

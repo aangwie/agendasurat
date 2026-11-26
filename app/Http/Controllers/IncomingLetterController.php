@@ -116,6 +116,36 @@ class IncomingLetterController extends Controller
      */
     public function attachment(IncomingLetter $incomingLetter): StreamedResponse
     {
+        return $this->attachmentResponse($incomingLetter, inline: false);
+    }
+
+    /**
+     * Pratinjau lampiran pada popup disposisi (wajib login).
+     *
+     * Berkas ditampilkan langsung di browser (inline) sehingga PDF dapat
+     * dibaca lewat iframe dan gambar tampil sebagai <img>.
+     */
+    public function previewAttachment(IncomingLetter $incomingLetter): StreamedResponse
+    {
+        return $this->attachmentResponse($incomingLetter, inline: true);
+    }
+
+    /**
+     * Tautan lampiran publik untuk penerima disposisi WhatsApp (tanpa login).
+     *
+     * Rute ini dilindungi middleware `signed:relative`, sehingga berkas hanya
+     * dapat dibuka lewat tautan yang dibuat aplikasi (tidak bisa ditebak).
+     */
+    public function publicAttachment(IncomingLetter $incomingLetter): StreamedResponse
+    {
+        return $this->attachmentResponse($incomingLetter, inline: true);
+    }
+
+    /**
+     * Kirim berkas lampiran sebagai unduhan atau pratinjau inline.
+     */
+    private function attachmentResponse(IncomingLetter $incomingLetter, bool $inline): StreamedResponse
+    {
         abort_unless($incomingLetter->hasAttachment(), 404);
 
         $disk = Storage::disk(IncomingLetter::ATTACHMENT_DISK);
@@ -123,7 +153,47 @@ class IncomingLetterController extends Controller
 
         abort_unless($disk->exists($path), 404);
 
-        return $disk->download($path, $incomingLetter->attachmentLabel());
+        $headers = [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=600',
+        ];
+
+        return $inline
+            ? $disk->response($path, $incomingLetter->attachmentLabel(), $headers, 'inline')
+            : $disk->download($path, $incomingLetter->attachmentLabel(), $headers);
+    }
+
+    /**
+     * Data lampiran untuk popup disposisi dan respons unggah/hapus.
+     *
+     * `preview_url` dipakai popup untuk menampilkan pratinjau berkas, sedangkan
+     * `url` tetap berupa tautan unduhan.
+     *
+     * @return array{
+     *     available: bool,
+     *     name: ?string,
+     *     kind: string,
+     *     mime: ?string,
+     *     url: ?string,
+     *     preview_url: ?string,
+     *     upload_url: string,
+     *     delete_url: string
+     * }
+     */
+    private function attachmentPayload(IncomingLetter $incomingLetter): array
+    {
+        $available = $incomingLetter->hasAttachment();
+
+        return [
+            'available' => $available,
+            'name' => $available ? $incomingLetter->attachmentLabel() : null,
+            'kind' => $incomingLetter->attachmentPreviewKind(),
+            'mime' => $incomingLetter->attachmentMimeType(),
+            'url' => $available ? route('surat-masuk.lampiran', $incomingLetter) : null,
+            'preview_url' => $available ? route('surat-masuk.lampiran.pratinjau', $incomingLetter) : null,
+            'upload_url' => route('surat-masuk.lampiran.unggah', $incomingLetter),
+            'delete_url' => route('surat-masuk.lampiran.hapus', $incomingLetter),
+        ];
     }
 
     /**
@@ -159,11 +229,7 @@ class IncomingLetterController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Lampiran surat berhasil diunggah.',
-            'attachment' => [
-                'available' => true,
-                'name' => $incomingLetter->attachmentLabel(),
-                'url' => route('surat-masuk.lampiran', $incomingLetter),
-            ],
+            'attachment' => $this->attachmentPayload($incomingLetter),
         ]);
     }
 
@@ -178,11 +244,7 @@ class IncomingLetterController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Lampiran surat dihapus.',
-            'attachment' => [
-                'available' => false,
-                'name' => null,
-                'url' => null,
-            ],
+            'attachment' => $this->attachmentPayload($incomingLetter),
         ]);
     }
 
@@ -230,13 +292,7 @@ class IncomingLetterController extends Controller
                 'received_date' => $incomingLetter->received_date?->locale('id')->translatedFormat('j F Y'),
                 'sifat' => $incomingLetter->sifatLabels(),
             ],
-            'attachment' => [
-                'available' => $incomingLetter->hasAttachment(),
-                'name' => $incomingLetter->attachmentLabel(),
-                'url' => route('surat-masuk.lampiran', $incomingLetter),
-                'upload_url' => route('surat-masuk.lampiran.unggah', $incomingLetter),
-                'delete_url' => route('surat-masuk.lampiran.hapus', $incomingLetter),
-            ],
+            'attachment' => $this->attachmentPayload($incomingLetter),
             'bidangs' => $bidangs,
             'send_url' => route('surat-masuk.disposisi.kirim', $incomingLetter),
             'cancel_url' => route('surat-masuk.disposisi.batal', $incomingLetter),

@@ -112,6 +112,32 @@
                                 Unggah Lampiran
                             </button>
                         </div>
+
+                        {{-- Pratinjau lampiran: gambar tampil langsung, PDF lewat iframe --}}
+                        <div data-disposisi-attachment-preview
+                            class="mt-2 hidden overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+                            <div class="flex items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 py-1.5">
+                                <p class="text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">
+                                    Pratinjau Lampiran
+                                </p>
+
+                                <a data-disposisi-attachment-open href="#" target="_blank" rel="noopener"
+                                    class="hidden text-[11px] font-semibold text-rose-600 underline underline-offset-2 hover:text-rose-700">
+                                    Buka di tab baru
+                                </a>
+                            </div>
+
+                            <img data-disposisi-attachment-image alt="Pratinjau lampiran surat"
+                                class="hidden max-h-80 w-full bg-white object-contain">
+
+                            <iframe data-disposisi-attachment-frame title="Pratinjau lampiran PDF"
+                                class="hidden h-80 w-full bg-white"></iframe>
+
+                            <p data-disposisi-attachment-fallback
+                                class="hidden px-3 py-3 text-[11px] text-zinc-500">
+                                Pratinjau tidak tersedia untuk jenis berkas ini. Gunakan tombol Unduh.
+                            </p>
+                        </div>
                     </div>
 
                     {{-- Ceklist bidang --}}

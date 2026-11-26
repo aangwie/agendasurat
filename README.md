@@ -256,6 +256,17 @@ disimpan pada tabel `letter_dispositions` sehingga popup dapat menampilkan
 riwayat terakhirnya. Bidang tanpa nomor atau yang nomornya sama dengan nomor
 gateway otomatis **dilewati**.
 
+Lampiran yang baru dipilih pada popup langsung menampilkan **pratinjau**: gambar
+tampil sebagai gambar, PDF lewat iframe, dan jenis berkas lain menampilkan pesan
+bantuan. Setelah diunggah, pratinjau memakai berkas tersimpan (rute
+`/surat-masuk/{id}/lampiran/pratinjau`, wajib login).
+
+Tautan lampiran pada pesan WhatsApp memakai **URL bertanda tangan**
+(`/surat-masuk/{id}/lampiran-umum?signature=...`) sehingga penerima disposisi
+dapat membuka berkasnya **tanpa login**. Tanpa tanda tangan yang sah, berkas
+tetap dilindungi (HTTP 403), dan tanda tangan dihitung dari URL relatif sehingga
+domain publik tetap dapat dipakai.
+
 #### Membatalkan disposisi yang salah
 
 Bila disposisi terkirim ke bidang yang keliru (mis. seharusnya **PTK** tetapi
@@ -276,6 +287,7 @@ masih aktif beserta status dan waktu kirimnya.
 
 Tautan pada pesan memakai `APP_URL`; bila `APP_URL` masih `localhost`, isi
 `WHATSAPP_GATEWAY_PUBLIC_URL` (lihat bagian *Uji Pesan WhatsApp & Lampiran*).
+Nilai ini juga menjadi domain tautan lampiran publik pada disposisi.
 
 ### Lembar disposisi (cetak)
 
