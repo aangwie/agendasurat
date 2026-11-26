@@ -42,8 +42,16 @@ Route::get('surat-masuk/{incomingLetter}/cetak-umum', [IncomingLetterController:
     ->middleware('signed:relative')
     ->name('surat-masuk.cetak.umum');
 
+// Logout otomatis karena tidak ada aktivitas (lihat config/session.php).
+// Berada di luar middleware `auth` agar tetap berfungsi ketika sesi sudah
+// tidak valid; rute ini hanya mengakhiri sesi lalu kembali ke halaman masuk.
+Route::get('keluar-idle', [AuthenticatedSessionController::class, 'idleLogout'])->name('logout.idle');
+
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+    // Sinyal aktivitas pengguna dari hitungan mundur di browser.
+    Route::get('sesi/aktif', [AuthenticatedSessionController::class, 'keepAlive'])->name('sesi.aktif');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('profil', [ProfileController::class, 'show'])->name('profil.show');

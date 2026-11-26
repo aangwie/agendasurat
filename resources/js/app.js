@@ -7,6 +7,7 @@ import { initIncomingLetterDisposition } from './surat-masuk-disposisi';
 import { initUserManagement } from './pengguna';
 import { initDateDisplays } from './date-display';
 import { initCsrfProtection } from './csrf';
+import { initIdleLogout } from './idle-logout';
 import { initSettingsPage } from './pengaturan';
 import { initAgendas } from './agenda';
 import { initOutgoingLetters } from './surat-keluar';
@@ -306,6 +307,11 @@ onReady(() => {
      * Proteksi CSRF: segarkan token & jaga sesi tetap aktif agar tidak 419.
      */
     initCsrfProtection();
+
+    /**
+     * Logout otomatis setelah tidak ada aktivitas (config session.idle_timeout).
+     */
+    initIdleLogout();
 
     /**
      * Datatable klasifikasi (pencarian, slice data, pagination via AJAX).

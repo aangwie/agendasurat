@@ -51,6 +51,10 @@
 
         return $prefix !== $route && request()->routeIs($prefix . '.*');
     };
+
+    // Logout otomatis: batas idle (detik) & waktu peringatan sebelum logout.
+    $idleTimeoutSeconds = max(0, (int) config('session.idle_timeout', 10)) * 60;
+    $idleWarningSeconds = max(0, (int) config('session.idle_warning', 60));
 @endphp
 
 <!DOCTYPE html>
@@ -60,6 +64,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#18181b">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    @if ($idleTimeoutSeconds > 0)
+        {{-- Logout otomatis bila tidak ada aktivitas (config/session.php). --}}
+        <meta name="session-idle-timeout" content="{{ $idleTimeoutSeconds }}">
+        <meta name="session-idle-warning" content="{{ $idleWarningSeconds }}">
+        <meta name="session-keepalive-url" content="{{ route('sesi.aktif') }}">
+        <meta name="session-idle-logout-url" content="{{ route('logout.idle') }}">
+    @endif
 
     <title>{{ $title }} · {{ config('app.name', 'Agenda Surat') }}</title>
 

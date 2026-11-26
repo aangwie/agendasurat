@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureSessionIsNotIdle;
 use App\Http\Middleware\EnsureUserCanManageIncomingLetters;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
             'surat-masuk.manage' => EnsureUserCanManageIncomingLetters::class,
+        ]);
+
+        // Logout otomatis bila tidak ada aktivitas (lihat config/session.php).
+        // Ditempatkan pada grup "web" agar berlaku untuk semua halaman yang
+        // membutuhkan login tanpa perlu menambahkannya ke setiap rute.
+        $middleware->web(append: [
+            EnsureSessionIsNotIdle::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -390,9 +390,12 @@ Aplikasi memakai beberapa lapis perlindungan agar halaman tidak sering menampilk
 
 1. **Masa sesi diperpanjang** — `SESSION_LIFETIME=240` menit (4 jam) dan
    `SESSION_EXPIRE_ON_CLOSE=false`, jadi sesi tidak habis saat tab ditutup.
+   Pengguna yang benar-benar meninggalkan aplikasi tetap dikeluarkan oleh
+   **logout otomatis** (lihat bagian berikut).
 2. **Token disegarkan otomatis** — `resources/js/csrf.js` memanggil `/csrf-token`
-   setiap 5 menit dan setiap kali tab kembali aktif. Endpoint ini sekaligus
-   memperpanjang masa aktif sesi, sehingga selama tab dibuka sesi tidak kedaluwarsa.
+   setiap 5 menit dan setiap kali tab kembali aktif. Detak ini hanya menyegarkan
+   token (mencegah 419) dan **tidak dihitung sebagai aktivitas pengguna**, sehingga
+   tidak memperpanjang batas logout otomatis.
 3. **Token disisipkan otomatis** pada setiap request `fetch` non-GET dan pada axios
    (`X-CSRF-TOKEN` dari `<meta name="csrf-token">`).
 4. **Halaman 419 yang ramah** — `resources/views/errors/419.blade.php` menampilkan
@@ -404,6 +407,42 @@ Aplikasi memakai beberapa lapis perlindungan agar halaman tidak sering menampilk
 Penyebab umum yang sebaiknya dihindari: membuka aplikasi dari dua alamat berbeda
 (`localhost` vs `127.0.0.1`), menghapus cookie saat halaman masih terbuka, atau
 mengganti `APP_KEY` saat pengguna masih login.
+
+## Logout otomatis (tidak ada aktivitas)
+
+Pengguna yang tidak melakukan aktivitas apa pun selama **10 menit** dikeluarkan
+secara otomatis. Batas waktu diatur pada `config/session.php`:
+
+```dotenv
+SESSION_IDLE_TIMEOUT=10   # menit tanpa aktivitas sebelum logout (0 = matikan)
+SESSION_IDLE_WARNING=60   # detik peringatan sebelum logout
+```
+
+Cara kerjanya:
+
+- **Server (penentu akhir)** — middleware `App\Http\Middleware\EnsureSessionIsNotIdle`
+  (terpasang pada grup `web`) menyimpan waktu aktivitas terakhir di session
+  (`last_activity_at`). Permintaan setelah batas terlampaui akan mengakhiri sesi:
+  permintaan biasa dialihkan ke halaman masuk dengan pesan *“Sesi Anda berakhir
+  karena tidak ada aktivitas selama 10 menit.”*, sedangkan permintaan AJAX
+  menerima **HTTP 401** `{"session_idle": true}`.
+- **Detak CSRF bukan aktivitas** — `/csrf-token` sengaja dilewati, sehingga tab
+  yang dibiarkan terbuka tetap logout sesuai batas.
+- **Browser (hitungan mundur)** — `resources/js/idle-logout.js` membaca
+  `<meta name="session-idle-timeout">` dari layout aplikasi. Aktivitas nyata
+  (klik, ketik, gulir, sentuh) memperpanjang sesi dan mengirim sinyal ke
+  `GET /sesi/aktif` maksimal sekali per menit.
+- **Peringatan** — 60 detik sebelum batas, SweetAlert2 menampilkan hitungan
+  mundur dengan pilihan **Tetap Masuk** (memperpanjang sesi) atau **Keluar**.
+  Bila waktu habis, browser membuka `GET /keluar-idle` yang mengakhiri sesi dan
+  kembali ke halaman masuk dengan pesan jelas.
+- **Beberapa tab** disinkronkan lewat `localStorage`, sehingga aktivitas di satu
+  tab tidak membuat tab lain logout lebih dulu.
+- Hitungan dimulai sejak login (`AuthenticatedSessionController::store`), dan
+  `SESSION_IDLE_TIMEOUT=0` mematikan seluruh fitur (meta tag tidak dirender).
+
+Setelah mengubah `SESSION_IDLE_TIMEOUT`/`SESSION_IDLE_WARNING` di `.env`, jalankan
+`php artisan config:clear` (atau `config:cache` ulang) agar nilai baru dipakai.
 
 ## Build assets ikut di-repository
 

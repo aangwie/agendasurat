@@ -1,10 +1,14 @@
 /**
  * Proteksi CSRF untuk mencegah "419 Page Expired".
  *
- * - Menyegarkan token dari /csrf-token secara berkala (sekaligus menjaga sesi
- *   tetap hidup selama tab dibuka) dan saat tab kembali aktif.
+ * - Menyegarkan token dari /csrf-token secara berkala (mencegah 419 saat sesi
+ *   lama dibuka) dan saat tab kembali aktif.
  * - Menyisipkan token pada setiap request fetch non-GET.
  * - Menampilkan notifikasi bila sesi benar-benar berakhir.
+ *
+ * Catatan: detak berkala ini hanya menyegarkan token, BUKAN aktivitas pengguna,
+ * sehingga logout otomatis (idle-logout.js) tetap berjalan sesuai
+ * `config('session.idle_timeout')`.
  */
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 menit
 

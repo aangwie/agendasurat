@@ -38,6 +38,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Idle Timeout (Logout Otomatis)
+    |--------------------------------------------------------------------------
+    |
+    | Jumlah menit tanpa aktivitas pengguna sebelum sesi diakhiri otomatis.
+    | Middleware `EnsureSessionIsNotIdle` memakai nilai ini sebagai penentu
+    | akhir, sedangkan layout aplikasi mengirimkannya ke browser untuk
+    | hitungan mundur dan peringatan sebelum logout.
+    |
+    | Detak CSRF berkala (`/csrf-token`) TIDAK dihitung sebagai aktivitas,
+    | sehingga tab yang dibiarkan terbuka tetap logout sesuai batas ini.
+    | Isi 0 untuk mematikan logout otomatis.
+    |
+    */
+
+    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 10),
+
+    /*
+    | Detik sebelum batas idle tercapai untuk menampilkan peringatan di browser.
+    | Nilai ini tidak boleh melebihi `idle_timeout`.
+    */
+
+    'idle_warning' => (int) env('SESSION_IDLE_WARNING', 60),
+
+    /*
+    |--------------------------------------------------------------------------
     | Session Encryption
     |--------------------------------------------------------------------------
     |
