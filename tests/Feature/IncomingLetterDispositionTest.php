@@ -113,9 +113,10 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertJsonPath('attachment.available', true)
             ->assertJsonPath('attachment.name', 'surat-edaran.pdf')
             ->assertJsonPath('attachment.kind', 'pdf')
-            ->assertJsonStructure(['attachment' => ['preview_url', 'upload_url', 'delete_url']]);
+            ->assertJsonStructure(['attachment' => ['preview_url', 'upload_url', 'delete_url', 'max_kb']]);
 
         $this->assertNotNull($response->json('attachment.preview_url'));
+        $this->assertGreaterThan(0, (int) $response->json('attachment.max_kb'));
 
         $bidangs = collect($response->json('bidangs'));
 
@@ -230,6 +231,140 @@ class IncomingLetterDispositionTest extends TestCase
 
         // Tanpa tanda tangan URL, berkas tidak dapat diakses.
         $this->get(route('surat-masuk.lampiran.umum', $letter))->assertForbidden();
+    }
+
+    public function test_sending_the_disposition_with_a_new_file_stores_it_and_links_the_attachment(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        $manager = $this->manager();
+
+        User::factory()->create([
+            'name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'kode_bidang' => '408.37.03',
+            'phone' => '6283333333333',
+        ]);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        Http::fake([
+            'gateway.billnesia.com/health' => Http::response(['status' => 'online']),
+            'gateway.billnesia.com/send' => Http::response(['success' => true, 'messageId' => 'DISP-ATT']),
+        ]);
+
+        // Berkas dikirim SEKALIGUS pada permintaan disposisi (tombol unggah terpisah
+        // tidak ditekan), sehingga tautan pesan tidak jatuh ke lembar disposisi.
+        $this->actingAs($manager)
+            ->post(route('surat-masuk.disposisi.kirim', $letter), [
+                'bidangs' => ['408.37.03'],
+                'attachment' => UploadedFile::fake()->create('surat-edaran.pdf', 80, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('sent', 1)
+            ->assertJsonPath('attachment.available', true)
+            ->assertJsonPath('attachment.name', 'surat-edaran.pdf')
+            ->assertJsonPath('attachment.kind', 'pdf');
+
+        $stored = $letter->fresh();
+
+        $this->assertTrue($stored->hasStoredAttachment());
+
+        $publicUrl = app(WhatsappNotifier::class)->publicUrl($stored);
+
+        $this->assertStringContainsString(
+            'https://agenda.example.go.id/surat-masuk/'.$stored->id.'/lampiran-umum?signature=',
+            $publicUrl,
+        );
+        $this->assertStringNotContainsString('/cetak-umum', $publicUrl);
+
+        Http::assertSent(function (Request $request) use ($publicUrl): bool {
+            if ($request->url() !== 'http://gateway.billnesia.com/send') {
+                return false;
+            }
+
+            $message = (string) ($request['pesan'] ?? '');
+
+            return str_contains($message, 'Disposisi Surat Masuk')
+                && str_contains($message, $publicUrl);
+        });
+
+        // Tautan pada pesan benar-benar membuka berkas lampiran tanpa login:
+        // rute publik mengembalikan berkas langsung, bukan redirect ke halaman login.
+        $response = $this->get($publicUrl)->assertOk();
+
+        $this->assertStringContainsString(
+            'inline',
+            (string) $response->headers->get('content-disposition'),
+        );
+        $this->assertFalse($response->isRedirection());
+    }
+
+    public function test_a_disposition_without_attachment_links_a_public_sheet_instead_of_the_login_page(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        $manager = $this->manager();
+
+        User::factory()->create([
+            'name' => 'Bidang Pembinaan Sekolah Dasar (SD)',
+            'kode_bidang' => '408.37.03',
+            'phone' => '6283333333333',
+        ]);
+
+        $letter = IncomingLetter::create($this->payload());
+
+        Http::fake([
+            'gateway.billnesia.com/health' => Http::response(['status' => 'online']),
+            'gateway.billnesia.com/send' => Http::response(['success' => true, 'messageId' => 'DISP-NOATT']),
+        ]);
+
+        $response = $this->actingAs($manager)
+            ->post(route('surat-masuk.disposisi.kirim', $letter), [
+                'bidangs' => ['408.37.03'],
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('sent', 1)
+            ->assertJsonPath('attachment.available', false);
+
+        // Pendisposisi diberi tahu bahwa tautan mengarah ke lembar disposisi.
+        $this->assertStringContainsString('belum tersimpan', (string) $response->json('message'));
+
+        $publicUrl = app(WhatsappNotifier::class)->publicUrl($letter->fresh());
+
+        $this->assertStringContainsString(
+            'https://agenda.example.go.id/surat-masuk/'.$letter->id.'/cetak-umum?signature=',
+            $publicUrl,
+        );
+
+        // Penerima tetap dapat membuka lembar disposisi tanpa login (bukan 302 ke login).
+        $response = $this->get($publicUrl);
+
+        $response->assertOk()
+            ->assertSee($letter->agenda_number);
+
+        $this->assertFalse($response->isRedirection());
+    }
+
+    public function test_a_missing_attachment_file_falls_back_to_the_public_sheet(): void
+    {
+        Storage::fake(IncomingLetter::ATTACHMENT_DISK);
+        config(['whatsapp-gateway.attachment_public_url' => 'https://agenda.example.go.id']);
+
+        // Kolom terisi tetapi berkas hilang dari disk (mis. storage terhapus saat deploy).
+        $letter = IncomingLetter::create($this->payload([
+            'attachment_path' => 'incoming-letters/hilang.pdf',
+            'attachment_name' => 'hilang.pdf',
+        ]));
+
+        $this->assertTrue($letter->hasAttachment());
+        $this->assertFalse($letter->hasStoredAttachment());
+
+        $url = app(WhatsappNotifier::class)->publicUrl($letter);
+
+        $this->assertStringContainsString('/cetak-umum?signature=', $url);
+        $this->get($url)->assertOk();
     }
 
     public function test_the_attachment_can_be_replaced_and_removed_from_the_disposition_popup(): void
@@ -643,6 +778,8 @@ class IncomingLetterDispositionTest extends TestCase
             ->assertSee('data-disposisi-attachment-preview', escape: false)
             ->assertSee('data-disposisi-attachment-image', escape: false)
             ->assertSee('data-disposisi-attachment-frame', escape: false)
+            ->assertSee('data-disposisi-attachment-status', escape: false)
+            ->assertSee('data-disposisi-attachment-hint', escape: false)
             ->assertSee('Pratinjau Lampiran')
             ->assertSee('data-disposisi-cancel-section', escape: false)
             ->assertSee('data-disposisi-cancel-list', escape: false)

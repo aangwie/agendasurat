@@ -319,36 +319,66 @@ class WhatsappNotifier
     }
 
     /**
-     * Tautan publik surat (lampiran bila ada, jika tidak halaman cetak).
+     * Tautan publik surat (lampiran bila ada, jika tidak lembar disposisi).
      *
      * Lampiran dibuka lewat tautan bertanda tangan sehingga penerima disposisi
      * dapat membukanya tanpa login. Tanda tangan dihitung dari URL relatif
      * (middleware `signed:relative`), sehingga domain publik pada
      * WHATSAPP_GATEWAY_PUBLIC_URL tetap dapat dipakai walau APP_URL menunjuk
-     * localhost.
+     * localhost, dan tetap sah ketika aplikasi dipasang pada subdirektori.
+     *
+     * Lampiran hanya ditautkan bila berkasnya benar-benar tersimpan
+     * (`hasStoredAttachment`). Bila belum/tidak ada, tautan diarahkan ke lembar
+     * disposisi versi publik agar penerima tidak tertahan di halaman login.
      */
     public function publicUrl(IncomingLetter $letter): string
     {
-        if ($letter->hasAttachment()) {
-            return $this->publicBaseUrl().URL::signedRoute(
-                'surat-masuk.lampiran.umum',
-                ['incomingLetter' => $letter],
-                null,
-                false,
-            );
-        }
+        $route = $letter->hasStoredAttachment()
+            ? 'surat-masuk.lampiran.umum'
+            : 'surat-masuk.cetak.umum';
 
-        return $this->publicBaseUrl().route('surat-masuk.cetak', ['incomingLetter' => $letter], false);
+        return $this->publicBaseUrl().URL::signedRoute(
+            $route,
+            ['incomingLetter' => $letter],
+            null,
+            false,
+        );
     }
 
     /**
-     * Basis URL publik aplikasi (WHATSAPP_GATEWAY_PUBLIC_URL bila diisi).
+     * Basis URL publik aplikasi.
+     *
+     * Urutan prioritas:
+     * 1. WHATSAPP_GATEWAY_PUBLIC_URL (paling eksplisit),
+     * 2. APP_URL bila host-nya sama dengan host permintaan (skema resmi dipakai),
+     * 3. host permintaan yang sedang berjalan — di hosting APP_URL sering masih
+     *    "http://localhost" sehingga tautan WhatsApp tidak bisa dibuka penerima.
      */
     private function publicBaseUrl(): string
     {
         $override = trim((string) config('whatsapp-gateway.attachment_public_url', ''));
 
-        return rtrim($override !== '' ? $override : (string) config('app.url'), '/');
+        if ($override !== '') {
+            return rtrim($override, '/');
+        }
+
+        $appUrl = rtrim((string) config('app.url'), '/');
+
+        if (app()->runningInConsole()) {
+            return $appUrl;
+        }
+
+        $host = rtrim(request()->getSchemeAndHttpHost(), '/');
+
+        if ($host === '') {
+            return $appUrl;
+        }
+
+        if (parse_url($appUrl, PHP_URL_HOST) === parse_url($host, PHP_URL_HOST)) {
+            return $appUrl;
+        }
+
+        return $host;
     }
 
     /**

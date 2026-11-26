@@ -251,21 +251,46 @@ juga tampil sebagai chip di samping kode bidang pada tabel pengguna.
 
 Saat **Kirim Disposisi** ditekan, setiap bidang yang dicentang menerima pesan
 WhatsApp berisi ringkasan surat, sifat, nama pendisposisi, dan **tautan unduhan
-surat** (lampiran bila ada, jika tidak halaman cetak). Hasil tiap bidang
+surat** (lampiran bila ada, jika tidak lembar disposisi). Hasil tiap bidang
 disimpan pada tabel `letter_dispositions` sehingga popup dapat menampilkan
 riwayat terakhirnya. Bidang tanpa nomor atau yang nomornya sama dengan nomor
 gateway otomatis **dilewati**.
 
 Lampiran yang baru dipilih pada popup langsung menampilkan **pratinjau**: gambar
 tampil sebagai gambar, PDF lewat iframe, dan jenis berkas lain menampilkan pesan
-bantuan. Setelah diunggah, pratinjau memakai berkas tersimpan (rute
-`/surat-masuk/{id}/lampiran/pratinjau`, wajib login).
+bantuan. Lencana status menunjukkan **Tersimpan** (sudah di server) atau
+**Belum diunggah**.
+
+Berkas yang baru dipilih **ikut terkirim bersama permintaan Kirim Disposisi**
+(multipart), sehingga tidak perlu menekan *Unggah Lampiran* lebih dulu. Dengan
+begitu tautan pada pesan WhatsApp selalu menunjuk ke **berkas lampiran**, bukan
+ke lembar disposisi. Tombol *Unggah Lampiran* tetap tersedia untuk menyimpan
+berkas lebih awal.
 
 Tautan lampiran pada pesan WhatsApp memakai **URL bertanda tangan**
 (`/surat-masuk/{id}/lampiran-umum?signature=...`) sehingga penerima disposisi
 dapat membuka berkasnya **tanpa login**. Tanpa tanda tangan yang sah, berkas
 tetap dilindungi (HTTP 403), dan tanda tangan dihitung dari URL relatif sehingga
-domain publik tetap dapat dipakai.
+tetap sah pada domain publik maupun subdirektori.
+
+Bila surat belum memiliki lampiran (atau berkasnya hilang dari disk), pesan
+menautkan **lembar disposisi versi publik** (`/surat-masuk/{id}/cetak-umum`,
+juga bertanda tangan) agar penerima tidak berhenti di halaman login. Pendisposisi
+mendapat catatan pada hasil pengiriman bahwa lampiran belum tersimpan.
+
+#### Catatan deploy di hosting
+
+- Jalankan `php artisan migrate --force`, lalu **`php artisan route:clear`**
+  (atau `route:cache` ulang) agar rute publik `lampiran-umum`/`cetak-umum`
+  terdaftar. Rute yang masih ter-cache membuat tautan gagal dibuat.
+- Pastikan batas unggah PHP mencukupi: `upload_max_filesize` dan `post_max_size`
+  minimal sebesar lampiran (mis. `12M`). Popup menampilkan batas efektif yang
+  dibaca dari server; berkas yang melebihi batas ditolak lebih awal dengan pesan
+  yang jelas.
+- Folder `storage/app/private` harus dapat ditulis (`storage:link` tidak
+  diperlukan karena lampiran disajikan lewat controller).
+- Tautan memakai `WHATSAPP_GATEWAY_PUBLIC_URL` bila diisi; jika tidak, dipakai
+  host permintaan yang sedang berjalan, lalu `APP_URL`.
 
 #### Membatalkan disposisi yang salah
 
@@ -285,9 +310,9 @@ masih aktif beserta status dan waktu kirimnya.
   mengirim pemberitahuan. Kegagalan kirim WhatsApp tidak membatalkan proses
   pembatalan.
 
-Tautan pada pesan memakai `APP_URL`; bila `APP_URL` masih `localhost`, isi
-`WHATSAPP_GATEWAY_PUBLIC_URL` (lihat bagian *Uji Pesan WhatsApp & Lampiran*).
-Nilai ini juga menjadi domain tautan lampiran publik pada disposisi.
+Tautan pada pesan memakai `WHATSAPP_GATEWAY_PUBLIC_URL` bila diisi; jika tidak,
+host permintaan yang sedang berjalan, lalu `APP_URL` (lihat bagian *Uji Pesan
+WhatsApp & Lampiran*).
 
 ### Lembar disposisi (cetak)
 

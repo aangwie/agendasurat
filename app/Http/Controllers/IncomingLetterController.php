@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -25,6 +26,11 @@ class IncomingLetterController extends Controller
     private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
     private const DEFAULT_PER_PAGE = 10;
+
+    /**
+     * Batas ukuran lampiran surat (KB).
+     */
+    private const ATTACHMENT_MAX_KB = 10240;
 
     public function __construct(private readonly WhatsappNotifier $notifier) {}
 
@@ -167,13 +173,16 @@ class IncomingLetterController extends Controller
      * Data lampiran untuk popup disposisi dan respons unggah/hapus.
      *
      * `preview_url` dipakai popup untuk menampilkan pratinjau berkas, sedangkan
-     * `url` tetap berupa tautan unduhan.
+     * `url` tetap berupa tautan unduhan. `max_kb` adalah batas unggah efektif
+     * (gabungan batas aplikasi dan batas PHP di server/hosting).
      *
      * @return array{
      *     available: bool,
      *     name: ?string,
      *     kind: string,
      *     mime: ?string,
+     *     size_kb: ?int,
+     *     max_kb: int,
      *     url: ?string,
      *     preview_url: ?string,
      *     upload_url: string,
@@ -182,18 +191,107 @@ class IncomingLetterController extends Controller
      */
     private function attachmentPayload(IncomingLetter $incomingLetter): array
     {
-        $available = $incomingLetter->hasAttachment();
+        $available = $incomingLetter->hasStoredAttachment();
+        $size = null;
+
+        if ($available) {
+            $size = Storage::disk(IncomingLetter::ATTACHMENT_DISK)->size((string) $incomingLetter->attachment_path);
+            $size = $size === false ? null : (int) $size;
+        }
 
         return [
             'available' => $available,
             'name' => $available ? $incomingLetter->attachmentLabel() : null,
-            'kind' => $incomingLetter->attachmentPreviewKind(),
-            'mime' => $incomingLetter->attachmentMimeType(),
+            'kind' => $available ? $incomingLetter->attachmentPreviewKind() : 'other',
+            'mime' => $available ? $incomingLetter->attachmentMimeType() : null,
+            'size_kb' => $size !== null ? max(1, (int) ceil($size / 1024)) : null,
+            'max_kb' => $this->attachmentMaxKb(),
             'url' => $available ? route('surat-masuk.lampiran', $incomingLetter) : null,
             'preview_url' => $available ? route('surat-masuk.lampiran.pratinjau', $incomingLetter) : null,
             'upload_url' => route('surat-masuk.lampiran.unggah', $incomingLetter),
             'delete_url' => route('surat-masuk.lampiran.hapus', $incomingLetter),
         ];
+    }
+
+    /**
+     * Aturan validasi berkas lampiran surat.
+     *
+     * @return array<int, string>
+     */
+    private function attachmentRules(): array
+    {
+        return ['file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:'.self::ATTACHMENT_MAX_KB];
+    }
+
+    /**
+     * Pesan validasi berkas lampiran surat.
+     *
+     * @return array<string, string>
+     */
+    private function attachmentMessages(): array
+    {
+        return [
+            'attachment.required' => 'Pilih berkas lampiran terlebih dahulu.',
+            'attachment.file' => 'Lampiran gagal diunggah. Silakan pilih ulang berkas.',
+            'attachment.mimes' => 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).',
+            'attachment.max' => 'Ukuran lampiran maksimal 10 MB.',
+            'attachment.uploaded' => 'Lampiran gagal diunggah. Batas ukuran berkas pada server hosting '
+                .'kemungkinan lebih kecil dari ukuran berkas ini.',
+        ];
+    }
+
+    /**
+     * Simpan berkas lampiran (mengganti lampiran lama bila ada).
+     */
+    private function storeAttachment(IncomingLetter $incomingLetter, UploadedFile $file): void
+    {
+        // Lampiran lama diganti: hapus berkas sebelumnya agar tidak menumpuk.
+        $incomingLetter->deleteAttachment();
+
+        $incomingLetter->update([
+            'attachment_path' => $file->store('incoming-letters', IncomingLetter::ATTACHMENT_DISK),
+            'attachment_name' => $file->getClientOriginalName(),
+        ]);
+    }
+
+    /**
+     * Batas unggah efektif (KB) dengan mempertimbangkan batas PHP di hosting.
+     */
+    private function attachmentMaxKb(): int
+    {
+        $limit = self::ATTACHMENT_MAX_KB;
+
+        foreach (['upload_max_filesize', 'post_max_size'] as $key) {
+            $bytes = $this->iniSizeToBytes((string) ini_get($key));
+
+            if ($bytes > 0) {
+                $limit = min($limit, (int) floor($bytes / 1024));
+            }
+        }
+
+        return max(1, $limit);
+    }
+
+    /**
+     * Ubah nilai konfigurasi PHP (mis. "8M", "512K") menjadi byte.
+     */
+    private function iniSizeToBytes(string $value): int
+    {
+        $value = trim($value);
+
+        if ($value === '' || $value === '-1') {
+            return 0;
+        }
+
+        $unit = strtolower(substr($value, -1));
+        $number = (float) $value;
+
+        return (int) match ($unit) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
     }
 
     /**
@@ -205,26 +303,15 @@ class IncomingLetterController extends Controller
     public function uploadAttachment(Request $request, IncomingLetter $incomingLetter): JsonResponse
     {
         $request->validate([
-            'attachment' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-        ], [
-            'attachment.required' => 'Pilih berkas lampiran terlebih dahulu.',
-            'attachment.file' => 'Lampiran gagal diunggah. Silakan pilih ulang berkas.',
-            'attachment.mimes' => 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).',
-            'attachment.max' => 'Ukuran lampiran maksimal 10 MB.',
-        ], [
+            'attachment' => ['required', ...$this->attachmentRules()],
+        ], $this->attachmentMessages(), [
             'attachment' => 'lampiran',
         ]);
 
         $file = $request->file('attachment');
         abort_if($file === null, 422);
 
-        // Lampiran lama diganti: hapus berkas sebelumnya agar tidak menumpuk.
-        $incomingLetter->deleteAttachment();
-
-        $incomingLetter->update([
-            'attachment_path' => $file->store('incoming-letters', IncomingLetter::ATTACHMENT_DISK),
-            'attachment_name' => $file->getClientOriginalName(),
-        ]);
+        $this->storeAttachment($incomingLetter, $file);
 
         return response()->json([
             'ok' => true,
@@ -301,17 +388,25 @@ class IncomingLetterController extends Controller
 
     /**
      * Kirim disposisi surat masuk ke bidang yang dicentang via WhatsApp.
+     *
+     * Berkas lampiran boleh dikirim sekaligus pada permintaan ini. Lampiran
+     * disimpan LEBIH DULU sebelum pesan disusun, sehingga tautan pada notifikasi
+     * selalu menunjuk ke berkas lampiran (bukan ke lembar disposisi) walaupun
+     * pengguna tidak sempat menekan tombol "Unggah Lampiran" terpisah.
      */
     public function sendDisposition(Request $request, IncomingLetter $incomingLetter): JsonResponse
     {
         $data = $request->validate([
             'bidangs' => ['required', 'array', 'min:1'],
             'bidangs.*' => ['string', 'max:30'],
+            'attachment' => ['nullable', ...$this->attachmentRules()],
         ], [
             'bidangs.required' => 'Pilih minimal satu bidang tujuan disposisi.',
             'bidangs.min' => 'Pilih minimal satu bidang tujuan disposisi.',
+            ...$this->attachmentMessages(),
         ], [
             'bidangs' => 'bidang tujuan',
+            'attachment' => 'lampiran',
         ]);
 
         $selected = array_values(array_unique($data['bidangs']));
@@ -325,6 +420,12 @@ class IncomingLetterController extends Controller
                 'ok' => false,
                 'message' => 'Bidang yang dipilih tidak ditemukan.',
             ], 422);
+        }
+
+        $file = $request->file('attachment');
+
+        if ($file !== null) {
+            $this->storeAttachment($incomingLetter, $file);
         }
 
         $user = $request->user();
@@ -354,13 +455,21 @@ class IncomingLetterController extends Controller
         $failed = collect($result['results'])->where('status', LetterDisposition::STATUS_FAILED)->count();
         $skipped = collect($result['results'])->where('status', LetterDisposition::STATUS_SKIPPED)->count();
 
+        $message = $this->dispositionSummary($sent, $failed, $skipped);
+
+        // Beri tahu pendisposisi bila pesan terkirim tanpa tautan lampiran.
+        if (! $incomingLetter->hasStoredAttachment()) {
+            $message .= ' Lampiran surat belum tersimpan, sehingga tautan pada pesan mengarah ke lembar disposisi.';
+        }
+
         return response()->json([
             'ok' => $sent > 0,
             'sent' => $sent,
             'failed' => $failed,
             'skipped' => $skipped,
-            'message' => $this->dispositionSummary($sent, $failed, $skipped),
+            'message' => $message,
             'results' => $stored,
+            'attachment' => $this->attachmentPayload($incomingLetter),
         ]);
     }
 
@@ -477,6 +586,25 @@ class IncomingLetterController extends Controller
      * Show the printable agenda sheet for the given letter.
      */
     public function print(IncomingLetter $incomingLetter): View
+    {
+        return $this->printSheet($incomingLetter);
+    }
+
+    /**
+     * Lembar disposisi versi publik (tautan bertanda tangan, tanpa login).
+     *
+     * Dipakai sebagai tautan cadangan pada notifikasi WhatsApp ketika surat
+     * belum memiliki lampiran, agar penerima tidak berhenti di halaman login.
+     */
+    public function publicPrint(IncomingLetter $incomingLetter): View
+    {
+        return $this->printSheet($incomingLetter);
+    }
+
+    /**
+     * Render lembar disposisi surat.
+     */
+    private function printSheet(IncomingLetter $incomingLetter): View
     {
         return view('surat-masuk.cetak', [
             'letter' => $incomingLetter,

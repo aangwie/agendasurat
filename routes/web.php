@@ -37,6 +37,11 @@ Route::get('surat-masuk/{incomingLetter}/lampiran-umum', [IncomingLetterControll
     ->middleware('signed:relative')
     ->name('surat-masuk.lampiran.umum');
 
+// Tautan cadangan bila surat belum memiliki lampiran: lembar disposisi publik.
+Route::get('surat-masuk/{incomingLetter}/cetak-umum', [IncomingLetterController::class, 'publicPrint'])
+    ->middleware('signed:relative')
+    ->name('surat-masuk.cetak.umum');
+
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 

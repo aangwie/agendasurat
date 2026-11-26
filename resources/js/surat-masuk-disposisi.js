@@ -60,6 +60,8 @@ export function initIncomingLetterDisposition() {
     const attachmentPreviewFrame = modal.querySelector('[data-disposisi-attachment-frame]');
     const attachmentPreviewFallback = modal.querySelector('[data-disposisi-attachment-fallback]');
     const attachmentPreviewOpen = modal.querySelector('[data-disposisi-attachment-open]');
+    const attachmentHint = modal.querySelector('[data-disposisi-attachment-hint]');
+    const attachmentStatus = modal.querySelector('[data-disposisi-attachment-status]');
     const subtitle = modal.querySelector('[data-disposisi-subtitle]');
     const cancelSection = modal.querySelector('[data-disposisi-cancel-section]');
     const cancelList = modal.querySelector('[data-disposisi-cancel-list]');
@@ -83,6 +85,12 @@ export function initIncomingLetterDisposition() {
     let attachmentUploadUrl = '';
     let attachmentDeleteUrl = '';
     let localPreviewUrl = null;
+    // Berkas yang sudah dipilih tetapi belum tersimpan di server.
+    let pendingFile = null;
+    // Data lampiran terakhir yang tersimpan di server (untuk memulihkan tampilan).
+    let lastAttachment = { available: false };
+    // Batas ukuran unggah efektif dari server (KB).
+    let maxAttachmentKb = 10240;
     let lastFocused = null;
     let activeButton = null;
     let bidangs = [];
@@ -379,10 +387,115 @@ export function initIncomingLetterDisposition() {
     };
 
     /**
+     * Format ukuran berkas (KB) agar mudah dibaca.
+     */
+    const formatSize = (kb) => {
+        if (!Number.isFinite(kb) || kb <= 0) {
+            return '';
+        }
+
+        return kb >= 1024 ? `${(kb / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.round(kb)} KB`;
+    };
+
+    /**
+     * Tampilkan lencana status lampiran ("Tersimpan" / "Belum diunggah").
+     */
+    const setAttachmentStatus = (state) => {
+        if (!attachmentStatus) {
+            return;
+        }
+
+        const tones = {
+            saved: ['Tersimpan', 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'],
+            pending: ['Belum diunggah', 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'],
+        };
+
+        const tone = tones[state];
+
+        attachmentStatus.classList.toggle('hidden', !tone);
+
+        if (tone) {
+            attachmentStatus.textContent = tone[0];
+            attachmentStatus.className = `badge ${tone[1]}`;
+        }
+    };
+
+    /**
+     * Perbarui keterangan batas ukuran unggah sesuai batas server (hosting).
+     */
+    const renderAttachmentHint = (maxKb) => {
+        if (!Number.isFinite(maxKb) || maxKb <= 0) {
+            return;
+        }
+
+        maxAttachmentKb = maxKb;
+
+        if (attachmentHint) {
+            attachmentHint.textContent = `PDF / gambar, maks. ${formatSize(maxKb)}`;
+        }
+    };
+
+    /**
+     * Validasi berkas sebelum diunggah (jenis & ukuran).
+     */
+    const validateFile = (file) => {
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+        if (file.type && !allowed.includes(file.type)) {
+            return 'Lampiran harus berupa PDF atau gambar (JPG, PNG, WEBP).';
+        }
+
+        if (file.size > maxAttachmentKb * 1024) {
+            return `Ukuran berkas ${formatSize(file.size / 1024)} melebihi batas server (${formatSize(
+                maxAttachmentKb,
+            )}). Perkecil berkas atau naikkan batas unggah hosting.`;
+        }
+
+        return null;
+    };
+
+    /**
+     * Tampilkan berkas yang baru dipilih sebagai "belum diunggah".
+     *
+     * Berkas tetap akan terkirim bersama permintaan disposisi, sehingga tautan
+     * pada pesan WhatsApp selalu menunjuk ke lampiran surat.
+     */
+    const applyPendingFile = (file) => {
+        pendingFile = file;
+
+        if (attachmentName) {
+            attachmentName.textContent = file.name;
+        }
+
+        if (attachmentMeta) {
+            const size = formatSize(file.size / 1024);
+
+            attachmentMeta.textContent = `Belum diunggah${size ? ` · ${size}` : ''} — otomatis diunggah saat Kirim Disposisi.`;
+        }
+
+        setAttachmentStatus('pending');
+
+        const kind = filePreviewKind(file);
+
+        if (kind === 'other') {
+            showAttachmentPreview('', 'other');
+
+            return;
+        }
+
+        localPreviewUrl = URL.createObjectURL(file);
+        showAttachmentPreview(localPreviewUrl, kind);
+    };
+
+    /**
      * Tampilkan status lampiran surat (nama, tautan unduh, tombol hapus, pratinjau).
      */
     const renderAttachment = (attachment = {}) => {
         const available = attachment.available === true;
+
+        lastAttachment = attachment;
+
+        renderAttachmentHint(attachment.max_kb);
 
         if (attachmentLink) {
             attachmentLink.href = attachment.url ?? '#';
@@ -402,10 +515,14 @@ export function initIncomingLetterDisposition() {
         }
 
         if (attachmentMeta) {
+            const size = formatSize(attachment.size_kb);
+
             attachmentMeta.textContent = available
-                ? 'Lampiran siap diunduh penerima disposisi.'
+                ? `Tersimpan di server${size ? ` · ${size}` : ''} — penerima disposisi dapat mengunduhnya.`
                 : 'Unggah lampiran di bawah ini agar penerima disposisi dapat mengunduhnya.';
         }
+
+        setAttachmentStatus(available ? 'saved' : null);
 
         if (available) {
             showAttachmentPreview(attachment.preview_url ?? '', attachment.kind ?? 'other');
@@ -451,6 +568,8 @@ export function initIncomingLetterDisposition() {
         cancelUrl = '';
         attachmentUploadUrl = '';
         attachmentDeleteUrl = '';
+        pendingFile = null;
+        lastAttachment = { available: false };
         hideResult();
         clearLocalPreview();
         hideAttachmentPreview();
@@ -662,23 +781,45 @@ export function initIncomingLetterDisposition() {
     });
 
     /**
+     * Baca respons JSON; beri pesan khusus bila server menolak ukuran berkas.
+     */
+    const readPayload = async (response) => {
+        if (response.status === 413) {
+            throw new Error(
+                'Berkas terlalu besar untuk server hosting. Perkecil lampiran atau naikkan batas ' +
+                    'upload_max_filesize / post_max_size pada server.',
+            );
+        }
+
+        return response.json().catch(() => ({}));
+    };
+
+    /**
      * Unggah lampiran surat dari popup disposisi.
      */
-    const uploadAttachment = async () => {
-        const file = attachmentInput?.files?.[0] ?? null;
-
+    const uploadAttachment = async (file = pendingFile ?? attachmentInput?.files?.[0] ?? null) => {
         if (!file) {
             setResult('error', 'Belum ada berkas dipilih', [
                 { name: 'Pilih berkas PDF atau gambar terlebih dahulu.', status: 'failed', label: 'Gagal' },
             ]);
 
-            return;
+            return false;
+        }
+
+        const invalid = validateFile(file);
+
+        if (invalid !== null) {
+            setResult('error', 'Lampiran tidak dapat diunggah', [
+                { name: invalid, status: 'failed', label: 'Gagal' },
+            ]);
+
+            return false;
         }
 
         if (!attachmentUploadUrl) {
             setResult('error', 'Alamat unggah lampiran tidak tersedia', []);
 
-            return;
+            return false;
         }
 
         attachmentUploadButton?.setAttribute('disabled', 'disabled');
@@ -696,7 +837,7 @@ export function initIncomingLetterDisposition() {
                 body,
             });
 
-            const payload = await response.json().catch(() => ({}));
+            const payload = await readPayload(response);
 
             if (!response.ok) {
                 const validation = payload.errors ? Object.values(payload.errors).flat()[0] : null;
@@ -705,6 +846,7 @@ export function initIncomingLetterDisposition() {
             }
 
             renderAttachment(payload.attachment ?? {});
+            pendingFile = null;
             clearLocalPreview();
 
             if (attachmentInput) {
@@ -712,10 +854,14 @@ export function initIncomingLetterDisposition() {
             }
 
             setResult('success', payload.message ?? 'Lampiran surat berhasil diunggah.', []);
+
+            return true;
         } catch (error) {
             setResult('error', 'Lampiran gagal diunggah', [
                 { name: error.message, status: 'failed', label: 'Gagal' },
             ]);
+
+            return false;
         } finally {
             attachmentUploadButton?.removeAttribute('disabled');
             attachmentUploadButton?.classList.remove('opacity-60');
@@ -763,31 +909,42 @@ export function initIncomingLetterDisposition() {
 
     /**
      * Pratinjau langsung berkas yang baru dipilih, sebelum diunggah.
+     *
+     * Berkas disimpan sementara sebagai `pendingFile` dan ikut terkirim saat
+     * tombol Kirim Disposisi ditekan, sehingga tautan WhatsApp tidak pernah
+     * jatuh ke lembar disposisi hanya karena unggahan terpisah terlewat/gagal.
      */
     attachmentInput?.addEventListener('change', () => {
         clearLocalPreview();
+        pendingFile = null;
 
         const file = attachmentInput.files?.[0] ?? null;
 
         if (!file) {
-            hideAttachmentPreview();
+            renderAttachment(lastAttachment);
 
             return;
         }
 
-        const kind = filePreviewKind(file);
+        const invalid = validateFile(file);
 
-        if (kind === 'other') {
-            showAttachmentPreview('', 'other');
+        if (invalid !== null) {
+            attachmentInput.value = '';
+            renderAttachment(lastAttachment);
+
+            setResult('error', 'Lampiran tidak dapat dipakai', [
+                { name: invalid, status: 'failed', label: 'Gagal' },
+            ]);
 
             return;
         }
 
-        localPreviewUrl = URL.createObjectURL(file);
-        showAttachmentPreview(localPreviewUrl, kind);
+        applyPendingFile(file);
     });
 
-    attachmentUploadButton?.addEventListener('click', uploadAttachment);
+    attachmentUploadButton?.addEventListener('click', () => {
+        uploadAttachment();
+    });
     attachmentDeleteButton?.addEventListener('click', deleteAttachment);
 
     form.addEventListener('submit', async (event) => {
@@ -811,23 +968,43 @@ export function initIncomingLetterDisposition() {
         submitButton?.classList.add('opacity-60');
 
         try {
+            // Lampiran yang baru dipilih ikut dikirim bersama disposisi agar
+            // pesan WhatsApp selalu menautkan berkas lampiran (bukan lembar
+            // disposisi) walaupun tombol "Unggah Lampiran" tidak ditekan.
+            const body = new FormData();
+
+            selected.forEach((kodeBidang) => body.append('bidangs[]', kodeBidang));
+
+            if (pendingFile) {
+                body.append('attachment', pendingFile);
+            }
+
+            // Jangan set Content-Type: browser menambahkan boundary multipart.
             const response = await fetch(sendUrl, {
                 method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ bidangs: selected }),
+                body,
             });
 
-            const payload = await response.json().catch(() => ({}));
+            const payload = await readPayload(response);
 
             if (!response.ok) {
                 const validation = payload.errors ? Object.values(payload.errors).flat()[0] : null;
 
                 throw new Error(validation ?? payload.message ?? 'Disposisi gagal dikirim.');
+            }
+
+            // Lampiran sudah tersimpan pada permintaan ini: tampilkan versi server.
+            if (payload.attachment) {
+                renderAttachment(payload.attachment);
+            }
+
+            pendingFile = null;
+            clearLocalPreview();
+
+            if (attachmentInput) {
+                attachmentInput.value = '';
             }
 
             const results = Array.isArray(payload.results) ? payload.results : [];

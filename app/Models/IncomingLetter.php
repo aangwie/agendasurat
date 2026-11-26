@@ -121,6 +121,22 @@ class IncomingLetter extends Model
     }
 
     /**
+     * Apakah lampiran tersimpan DAN berkasnya benar-benar ada di disk.
+     *
+     * Dipakai sebelum membuat tautan publik pada notifikasi WhatsApp: tautan
+     * hanya dibuat bila berkasnya dapat dikirim, sehingga penerima tidak
+     * menerima tautan yang berakhir 404 (mis. berkas hilang setelah deploy).
+     */
+    public function hasStoredAttachment(): bool
+    {
+        if (! $this->hasAttachment()) {
+            return false;
+        }
+
+        return Storage::disk(self::ATTACHMENT_DISK)->exists((string) $this->attachment_path);
+    }
+
+    /**
      * Nama berkas lampiran yang ditampilkan ke pengguna.
      */
     public function attachmentLabel(): string

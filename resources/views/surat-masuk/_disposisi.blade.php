@@ -64,7 +64,9 @@
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <p class="text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Lampiran Surat</p>
-                            <span class="text-[11px] text-zinc-400">PDF / gambar, maks. 10 MB</span>
+                            <span data-disposisi-attachment-hint class="text-[11px] text-zinc-400">
+                                PDF / gambar, maks. 10 MB
+                            </span>
                         </div>
 
                         <div data-disposisi-attachment
@@ -87,6 +89,8 @@
                             </span>
 
                             <span class="flex shrink-0 items-center gap-1">
+                                <span data-disposisi-attachment-status class="badge hidden"></span>
+
                                 <a data-disposisi-attachment-link href="#" target="_blank" rel="noopener"
                                     class="btn btn-secondary hidden py-1.5 text-xs">
                                     <x-icon name="arrow-down-tray" class="size-3.5" />
